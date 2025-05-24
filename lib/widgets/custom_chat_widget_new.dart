@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../models/message.dart';
 import '../services/improved_file_upload_service.dart';
-import '../services/improved_chat_service.dart';
 import '../presentation/widgets/chat/professional_chat_input.dart';
 import '../presentation/widgets/chat/professional_attachment_menu.dart';
 import '../presentation/widgets/chat/professional_file_upload_handler.dart';
@@ -15,7 +14,7 @@ import '../utils/file_type_helper.dart';
 import '../screens/file_viewers/text_file_viewer_screen.dart';
 import 'chat_image_thumbnail.dart';
 import 'video_player_widget.dart';
-import 'rest_api_file_upload_widget.dart';
+
 import '../custom_routes.dart';
 
 class CustomChatWidgetNew extends StatefulWidget {

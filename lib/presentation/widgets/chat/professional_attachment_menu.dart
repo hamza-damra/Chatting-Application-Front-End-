@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
-import 'dart:io';
-import '../../../theme/app_theme.dart';
 
 /// Professional attachment menu widget with modern design matching the input field
 class ProfessionalAttachmentMenu extends StatefulWidget {

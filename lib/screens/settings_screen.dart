@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/api_auth_provider.dart';
 import '../widgets/custom_button.dart';
+import 'shimmer_test_screen.dart';
 import 'media_gallery_screen.dart';
 import 'storage_stats_screen.dart';
 import 'debug_screen.dart';
@@ -167,6 +168,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const DebugScreen()),
+            );
+          },
+        ),
+        _buildSettingCard(
+          icon: Icons.animation,
+          title: 'Shimmer Effects Test',
+          subtitle: 'View all shimmer loading animations',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ShimmerTestScreen(),
+              ),
             );
           },
         ),

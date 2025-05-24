@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/message.dart';
 import '../services/improved_file_upload_service.dart';
 import '../utils/logger.dart';
+import 'shimmer_widgets.dart';
 
 class CustomChatWidgetNew extends StatefulWidget {
   final List<Message> messages;
@@ -712,24 +713,11 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
               height: 180,
               loadingBuilder: (context, child, loadingProgress) {
                 if (loadingProgress == null) return child;
-                return Container(
+                return ShimmerWidgets.chatImageShimmer(
+                  width: double.infinity,
                   height: 180,
-                  color:
-                      isCurrentUser
-                          ? _primaryColor.withAlpha(204)
-                          : Colors.grey[200],
-                  child: Center(
-                    child: CircularProgressIndicator(
-                      value:
-                          loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                                  loadingProgress.expectedTotalBytes!
-                              : null,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isCurrentUser ? Colors.white : _primaryColor,
-                      ),
-                    ),
-                  ),
+                  isCurrentUser: isCurrentUser,
+                  primaryColor: _primaryColor,
                 );
               },
               errorBuilder: (context, error, stackTrace) {

@@ -9,6 +9,7 @@ import '../../../presentation/blocs/messages/message_event.dart';
 import '../../../presentation/widgets/chat/chat_messages_widget.dart';
 import '../../../presentation/widgets/chat/professional_chat_input.dart';
 import '../../../presentation/widgets/chat/professional_attachment_menu.dart';
+import '../../../widgets/shimmer_widgets.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatRoomId;
@@ -142,7 +143,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       chatRoomId: widget.chatRoomId,
                       currentUserId: _currentUserId!,
                     )
-                    : const Center(child: CircularProgressIndicator()),
+                    : Center(child: ShimmerWidgets.authLoadingShimmer()),
           ),
 
           // Professional attachment menu

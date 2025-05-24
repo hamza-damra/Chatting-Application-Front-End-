@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'shimmer_widgets.dart';
 
 class CustomButton extends StatelessWidget {
   final String text;
@@ -60,13 +61,17 @@ class CustomButton extends StatelessWidget {
 
   Widget _buildButtonContent(ThemeData theme) {
     return isLoading
-        ? SizedBox(
-          height: 20,
+        ? ShimmerWidgets.buttonShimmer(
           width: 20,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: isOutlined ? theme.colorScheme.primary : Colors.white,
-          ),
+          height: 20,
+          baseColor:
+              isOutlined
+                  ? theme.colorScheme.primary.withOpacity(0.3)
+                  : Colors.white.withOpacity(0.3),
+          highlightColor:
+              isOutlined
+                  ? theme.colorScheme.primary.withOpacity(0.7)
+                  : Colors.white.withOpacity(0.7),
         )
         : Text(
           text,

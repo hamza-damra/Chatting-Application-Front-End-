@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/file_type_helper.dart';
+import 'shimmer_widgets.dart';
 import '../screens/file_viewers/text_file_viewer_screen.dart';
 import 'video_player_widget.dart';
 
@@ -111,18 +112,10 @@ class _EnhancedFileViewerState extends State<EnhancedFileViewer> {
             fit: BoxFit.cover,
             loadingBuilder: (context, child, loadingProgress) {
               if (loadingProgress == null) return child;
-              return SizedBox(
+              return ShimmerWidgets.imageShimmer(
                 width: 200,
                 height: 200,
-                child: Center(
-                  child: CircularProgressIndicator(
-                    value:
-                        loadingProgress.expectedTotalBytes != null
-                            ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                            : null,
-                  ),
-                ),
+                borderRadius: BorderRadius.circular(8),
               );
             },
             errorBuilder: (context, error, stackTrace) {

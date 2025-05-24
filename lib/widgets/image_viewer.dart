@@ -5,6 +5,7 @@ import '../utils/url_utils.dart';
 import '../utils/logger.dart';
 import '../core/services/token_service.dart';
 import 'authenticated_image_provider.dart';
+import 'shimmer_widgets.dart';
 
 class ImageViewer extends StatelessWidget {
   final String imageUrl;
@@ -95,9 +96,8 @@ class ImageViewer extends StatelessWidget {
           gaplessPlayback: true,
           errorBuilder: (context, error, stackTrace) {
             debugPrint('ImageViewer: Error loading full image: $error');
-            AppLogger.e(
-              'ImageViewer',
-              'Failed to load image: $displayUrl, Error: $error',
+            debugPrint(
+              'ImageViewer: Failed to load image: $displayUrl, Error: $error',
             );
             return Container(
               color: Colors.black,
@@ -172,36 +172,7 @@ class ImageViewer extends StatelessWidget {
             );
           },
           loadingBuilder: (context, event) {
-            return Container(
-              color: Colors.black,
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 3,
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Loading image...',
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
-                    ),
-                    if (event != null && event.expectedTotalBytes != null)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          '${((event.cumulativeBytesLoaded / event.expectedTotalBytes!) * 100).toInt()}%',
-                          style: const TextStyle(
-                            color: Colors.white54,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
+            return ShimmerWidgets.fullScreenImageShimmer();
           },
         );
       },

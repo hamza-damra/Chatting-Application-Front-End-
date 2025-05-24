@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../theme/app_theme.dart';
 
 /// Professional chat input widget with modern design and smooth animations
 class ProfessionalChatInput extends StatefulWidget {

@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../services/improved_file_upload_service.dart';
 import '../widgets/search_chat_delegate.dart';
-import '../widgets/fix_status_widget.dart';
 import 'chat/create_group_screen.dart';
 import 'chat/create_private_chat_screen.dart';
 import 'chat/group_chat_list.dart';
@@ -37,29 +36,15 @@ class _HomeScreenState extends State<HomeScreen> {
             .currentUserId; // Assuming currentUserId is stored in ChatProvider
 
     final screens = <Widget>[
-      Column(
-        children: [
-          const FixStatusWidget(),
-          Expanded(
-            child: PrivateChatList(
-              chatProvider: chatProvider,
-              webSocketService: webSocketService,
-              currentUserId: currentUserId,
-            ),
-          ),
-        ],
+      PrivateChatList(
+        chatProvider: chatProvider,
+        webSocketService: webSocketService,
+        currentUserId: currentUserId,
       ),
-      Column(
-        children: [
-          const FixStatusWidget(),
-          Expanded(
-            child: GroupChatList(
-              chatProvider: chatProvider,
-              webSocketService: webSocketService,
-              currentUserId: currentUserId,
-            ),
-          ),
-        ],
+      GroupChatList(
+        chatProvider: chatProvider,
+        webSocketService: webSocketService,
+        currentUserId: currentUserId,
       ),
       const ProfileScreen(),
       const SettingsScreen(),

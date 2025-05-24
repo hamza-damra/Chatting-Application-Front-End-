@@ -5,6 +5,7 @@ import 'package:chatting_application/services/improved_file_upload_service.dart'
 import 'package:chatting_application/screens/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../widgets/shimmer_widgets.dart';
 
 class GroupChatList extends StatefulWidget {
   final ChatProvider chatProvider;
@@ -66,7 +67,10 @@ class _GroupChatListState extends State<GroupChatList> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return ListView.builder(
+        itemCount: 8, // Show 8 shimmer items
+        itemBuilder: (context, index) => ShimmerWidgets.listItemShimmer(),
+      );
     }
 
     if (_hasError) {

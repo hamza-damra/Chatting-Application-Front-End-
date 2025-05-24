@@ -5,6 +5,7 @@ import '../../../presentation/blocs/chat/chat_event.dart';
 import '../../../presentation/blocs/chat/chat_state.dart';
 import '../../../presentation/widgets/chat/chat_list_item.dart';
 import '../../../core/constants/app_theme.dart';
+import '../../../widgets/shimmer_widgets.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -96,7 +97,10 @@ class _ChatListScreenState extends State<ChatListScreen> {
             );
           }
 
-          return const Center(child: CircularProgressIndicator());
+          return ListView.builder(
+            itemCount: 6, // Show 6 shimmer items
+            itemBuilder: (context, index) => ShimmerWidgets.listItemShimmer(),
+          );
         },
       ),
       floatingActionButton: FloatingActionButton(

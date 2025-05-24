@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../../utils/logger.dart';
 import '../../core/services/token_service.dart';
+import '../../widgets/shimmer_widgets.dart';
 
 class TextFileViewerScreen extends StatefulWidget {
   final String fileUrl;
@@ -247,16 +248,7 @@ class _TextFileViewerScreenState extends State<TextFileViewerScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading file content...'),
-          ],
-        ),
-      );
+      return Center(child: ShimmerWidgets.fileLoadingShimmer());
     }
 
     if (_error != null) {

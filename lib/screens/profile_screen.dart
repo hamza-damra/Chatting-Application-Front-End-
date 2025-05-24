@@ -6,6 +6,7 @@ import '../providers/api_auth_provider.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 import '../widgets/user_avatar.dart';
+import '../widgets/shimmer_widgets.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -117,7 +118,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final theme = Theme.of(context);
 
     if (user == null) {
-      return const Center(child: CircularProgressIndicator());
+      return ShimmerWidgets.profileShimmer();
     }
 
     return SingleChildScrollView(

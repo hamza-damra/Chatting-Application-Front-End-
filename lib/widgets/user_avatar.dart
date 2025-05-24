@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'shimmer_widgets.dart';
 
 class UserAvatar extends StatelessWidget {
   final String? imageUrl;
@@ -28,20 +29,14 @@ class UserAvatar extends StatelessWidget {
                 backgroundImage: imageProvider,
               ),
           placeholder:
-              (context, url) => CircleAvatar(
-                radius: size / 2,
-                backgroundColor:
-                    backgroundColor ?? theme.colorScheme.primary.withAlpha(51),
-                child: Center(
-                  child: SizedBox(
-                    width: size / 3,
-                    height: size / 3,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.0,
-                      color: theme.colorScheme.primary,
-                    ),
-                  ),
-                ),
+              (context, url) => ShimmerWidgets.avatarShimmer(
+                size: size,
+                baseColor:
+                    backgroundColor?.withValues(alpha: 0.3) ??
+                    theme.colorScheme.primary.withValues(alpha: 0.3),
+                highlightColor:
+                    backgroundColor?.withValues(alpha: 0.1) ??
+                    theme.colorScheme.primary.withValues(alpha: 0.1),
               ),
           errorWidget: (context, url, error) => _buildInitialsAvatar(theme),
         )

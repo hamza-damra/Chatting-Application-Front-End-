@@ -30,6 +30,9 @@ import 'screens/home_screen.dart';
 
 import 'custom_routes.dart';
 
+// Widgets
+import 'widgets/shimmer_widgets.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -155,8 +158,8 @@ class AuthWrapper extends StatelessWidget {
 
         // Show loading indicator while checking authentication state
         if (state is AuthLoading || authProvider.isLoading) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
+          return Scaffold(
+            body: Center(child: ShimmerWidgets.authLoadingShimmer()),
           );
         }
 

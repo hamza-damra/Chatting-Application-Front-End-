@@ -5,6 +5,7 @@ import '../../../presentation/blocs/users/user_bloc.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../presentation/blocs/chat/chat_bloc.dart';
 import '../../../presentation/blocs/chat/chat_event.dart';
+import '../../../widgets/shimmer_widgets.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -192,7 +193,11 @@ class _UserListScreenState extends State<UserListScreen> {
                   );
                 }
 
-                return const Center(child: CircularProgressIndicator());
+                return ListView.builder(
+                  itemCount: 8, // Show 8 shimmer items
+                  itemBuilder:
+                      (context, index) => ShimmerWidgets.listItemShimmer(),
+                );
               },
             ),
           ),

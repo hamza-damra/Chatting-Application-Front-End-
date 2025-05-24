@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/logger.dart';
+import '../widgets/shimmer_widgets.dart';
 import '../widgets/video_player_widget.dart';
 
 class MediaPreviewScreen extends StatefulWidget {
@@ -92,16 +93,7 @@ class _MediaPreviewScreenState extends State<MediaPreviewScreen> {
       ),
       body:
           _isLoading
-              ? Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircularProgressIndicator(value: _loadProgress),
-                    const SizedBox(height: 16),
-                    Text('Loading media... ${(_loadProgress * 100).toInt()}%'),
-                  ],
-                ),
-              )
+              ? Center(child: ShimmerWidgets.mediaPreviewShimmer())
               : _errorMessage.isNotEmpty
               ? Center(
                 child: Column(
@@ -134,13 +126,7 @@ class _MediaPreviewScreenState extends State<MediaPreviewScreen> {
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Center(
-              child: CircularProgressIndicator(
-                value:
-                    loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                            loadingProgress.expectedTotalBytes!
-                        : null,
-              ),
+              child: ShimmerWidgets.imageShimmer(width: 200, height: 200),
             );
           },
           errorBuilder: (context, error, stackTrace) {

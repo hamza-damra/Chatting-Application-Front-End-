@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat Tester</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .connection-panel {
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+        .chat-panel {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+        .messages {
+            flex-grow: 1;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 10px;
+            margin-bottom: 15px;
+            overflow-y: auto;
+            max-height: 400px;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        .sent {
+            background-color: #e3f2fd;
+            align-self: flex-end;
+            margin-left: 20%;
+        }
+        .received {
+            background-color: #f5f5f5;
+            align-self: flex-start;
+            margin-right: 20%;
+        }
+        .system {
+            background-color: #fff9c4;
+            text-align: center;
+            font-style: italic;
+        }
+        .input-panel {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        input, button, select, textarea {
+            padding: 8px;
+            margin-right: 5px;
+        }
+        input[type="text"], textarea {
+            flex-grow: 1;
+        }
+        .status {
+            color: #666;
+            font-style: italic;
+            margin-bottom: 10px;
+        }
+        .connected {
+            color: green;
+        }
+        .disconnected {
+            color: red;
+        }
+        .error {
+            color: red;
+            font-weight: bold;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        .tab {
+            padding: 10px 15px;
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 5px 5px 0 0;
+            cursor: pointer;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+        }
+        .tab-content {
+            display: none;
+            border: 1px solid #ddd;
+            border-radius: 0 5px 5px 5px;
+            padding: 15px;
+            margin-top: -1px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebSocket Chat Tester</h1>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="connection">Connection</div>
+            <div class="tab" data-tab="chat">Chat</div>
+            <div class="tab" data-tab="raw">Raw STOMP</div>
+        </div>
+
+        <div class="tab-content active" id="connection">
+            <div class="connection-panel">
+                <h2>WebSocket Connection</h2>
+                <div>
+                    <label for="wsUrl">WebSocket URL:</label>
+                    <input type="text" id="wsUrl" value="ws://localhost:8080/ws" style="width: 300px;">
+                </div>
+                <div style="margin-top: 10px;">
+                    <label for="authToken">JWT Token:</label>
+                    <input type="text" id="authToken" placeholder="Bearer token (optional)" style="width: 300px;">
+                </div>
+                <div style="margin-top: 10px;">
+                    <button id="connectBtn">Connect</button>
+                    <button id="disconnectBtn" disabled>Disconnect</button>
+                </div>
+                <div class="status disconnected" id="connectionStatus">Disconnected</div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="chat">
+            <div class="chat-panel">
+                <h2>Chat Room</h2>
+                <div style="margin-bottom: 10px;">
+                    <label for="roomId">Room ID:</label>
+                    <input type="number" id="roomId" value="1" min="1" style="width: 100px;">
+                    <button id="subscribeBtn" disabled>Subscribe</button>
+                    <button id="joinRoomBtn" disabled>Join Room</button>
+                    <button id="leaveRoomBtn" disabled>Leave Room</button>
+                </div>
+
+                <div class="messages" id="messages"></div>
+
+                <div class="input-panel">
+                    <input type="text" id="messageInput" placeholder="Type a message..." disabled>
+                    <select id="contentType">
+                        <option value="TEXT">Text</option>
+                        <option value="IMAGE">Image</option>
+                    </select>
+                    <button id="sendBtn" disabled>Send</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-content" id="raw">
+            <h2>Raw STOMP Commands</h2>
+            <div style="margin-bottom: 10px;">
+                <label for="destination">Destination:</label>
+                <input type="text" id="destination" value="/app/chat.sendMessage/1" style="width: 200px;">
+                <small>(Format: /app/chat.sendMessage/{roomId})</small>
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="headers">Headers (JSON):</label>
+                <input type="text" id="headers" value='{"content-type": "application/json"}' style="width: 300px;">
+            </div>
+            <div style="margin-bottom: 10px;">
+                <label for="payload">Payload (JSON):</label>
+                <textarea id="payload" rows="5" style="width: 100%;">{
+  "chatRoomId": 1,
+  "content": "Hello via WebSocket!",
+  "contentType": "TEXT",
+  "type": "CHAT"
+}</textarea>
+            </div>
+            <button id="sendRawBtn" disabled>Send Raw STOMP Frame</button>
+
+            <h3>Received Messages</h3>
+            <div id="rawMessages" style="border: 1px solid #ddd; padding: 10px; height: 200px; overflow-y: auto; font-family: monospace;"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7.0.0/bundles/stomp.umd.min.js"></script>
+    <script>
+        // DOM Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const wsUrlInput = document.getElementById('wsUrl');
+        const authTokenInput = document.getElementById('authToken');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const roomIdInput = document.getElementById('roomId');
+        const subscribeBtn = document.getElementById('subscribeBtn');
+        const joinRoomBtn = document.getElementById('joinRoomBtn');
+        const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const contentTypeSelect = document.getElementById('contentType');
+        const sendBtn = document.getElementById('sendBtn');
+        const destinationInput = document.getElementById('destination');
+        const headersInput = document.getElementById('headers');
+        const payloadInput = document.getElementById('payload');
+        const sendRawBtn = document.getElementById('sendRawBtn');
+        const rawMessagesContainer = document.getElementById('rawMessages');
+
+        // Tab handling
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+
+                // Remove active class from all tabs and contents
+                tabs.forEach(t => t.classList.remove('active'));
+                tabContents.forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding content
+                tab.classList.add('active');
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // STOMP Client
+        let stompClient = null;
+        let subscription = null;
+
+        // Connect to WebSocket
+        connectBtn.addEventListener('click', () => {
+            const wsUrl = wsUrlInput.value;
+            const authToken = authTokenInput.value;
+
+            connectionStatus.textContent = 'Connecting...';
+            connectionStatus.className = 'status';
+
+            // Create STOMP client
+            stompClient = new StompJs.Client({
+                brokerURL: wsUrl,
+                connectHeaders: authToken ? { 'Authorization': authToken } : {},
+                debug: function(str) {
+                    console.log(str);
+                },
+                reconnectDelay: 5000,
+                heartbeatIncoming: 4000,
+                heartbeatOutgoing: 4000
+            });
+
+            // Connect handlers
+            stompClient.onConnect = (frame) => {
+                connectionStatus.textContent = 'Connected!';
+                connectionStatus.className = 'status connected';
+
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                subscribeBtn.disabled = false;
+                joinRoomBtn.disabled = false;
+                leaveRoomBtn.disabled = false;
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                sendRawBtn.disabled = false;
+
+                addSystemMessage('Connected to WebSocket server');
+                addRawMessage('CONNECTED', frame.headers, '');
+            };
+
+            stompClient.onStompError = (frame) => {
+                connectionStatus.textContent = `Error: ${frame.headers['message']}`;
+                connectionStatus.className = 'status error';
+
+                addSystemMessage(`Error: ${frame.headers['message']}`);
+                addRawMessage('ERROR', frame.headers, frame.body);
+            };
+
+            stompClient.onWebSocketClose = () => {
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'status disconnected';
+
+                resetButtons();
+                addSystemMessage('Disconnected from WebSocket server');
+            };
+
+            stompClient.onWebSocketError = (event) => {
+                connectionStatus.textContent = 'WebSocket Error';
+                connectionStatus.className = 'status error';
+
+                resetButtons();
+                addSystemMessage('WebSocket Error: ' + event.toString());
+            };
+
+            // Activate the client
+            stompClient.activate();
+        });
+
+        // Disconnect from WebSocket
+        disconnectBtn.addEventListener('click', () => {
+            if (stompClient) {
+                stompClient.deactivate();
+                stompClient = null;
+                subscription = null;
+
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'status disconnected';
+
+                resetButtons();
+                addSystemMessage('Disconnected from WebSocket server');
+            }
+        });
+
+        // Subscribe to a chat room
+        subscribeBtn.addEventListener('click', () => {
+            if (!stompClient || !stompClient.connected) return;
+
+            const roomId = roomIdInput.value;
+            const destination = `/topic/chatrooms/${roomId}`;
+
+            if (subscription) {
+                subscription.unsubscribe();
+                addSystemMessage(`Unsubscribed from previous room`);
+            }
+
+            subscription = stompClient.subscribe(destination, (message) => {
+                try {
+                    const data = JSON.parse(message.body);
+                    addReceivedMessage(data);
+                    addRawMessage('MESSAGE', message.headers, message.body);
+                } catch (e) {
+                    addSystemMessage(`Error parsing message: ${e.message}`);
+                    addRawMessage('MESSAGE (ERROR)', message.headers, message.body);
+                }
+            });
+
+            addSystemMessage(`Subscribed to room ${roomId}`);
+        });
+
+        // Join a chat room
+        joinRoomBtn.addEventListener('click', () => {
+            if (!stompClient || !stompClient.connected) return;
+
+            const roomId = parseInt(roomIdInput.value);
+            const destination = '/app/chat.addUser';
+            const body = JSON.stringify({
+                chatRoomId: roomId,
+                roomId: roomId,
+                id: roomId,
+                room_id: roomId,
+                chat_room_id: roomId,
+                type: 'JOIN'
+            });
+
+            stompClient.publish({
+                destination: destination,
+                body: body,
+                headers: { 'content-type': 'application/json' }
+            });
+
+            addSystemMessage(`Sent join request for room ${roomId}`);
+            addSentMessage({
+                type: 'JOIN',
+                chatRoomId: roomId,
+                content: 'User joined the chat'
+            });
+        });
+
+        // Leave a chat room
+        leaveRoomBtn.addEventListener('click', () => {
+            if (!stompClient || !stompClient.connected) return;
+
+            const roomId = parseInt(roomIdInput.value);
+            const destination = '/app/chat.leaveRoom';
+            const body = JSON.stringify({
+                chatRoomId: roomId,
+                roomId: roomId,
+                id: roomId,
+                room_id: roomId,
+                chat_room_id: roomId,
+                type: 'LEAVE'
+            });
+
+            stompClient.publish({
+                destination: destination,
+                body: body,
+                headers: { 'content-type': 'application/json' }
+            });
+
+            addSystemMessage(`Sent leave request for room ${roomId}`);
+            addSentMessage({
+                type: 'LEAVE',
+                chatRoomId: roomId,
+                content: 'User left the chat'
+            });
+        });
+
+        // Send a message
+        sendBtn.addEventListener('click', () => {
+            if (!stompClient || !stompClient.connected) return;
+
+            const roomId = parseInt(roomIdInput.value);
+            const content = messageInput.value;
+            const contentType = contentTypeSelect.value;
+
+            if (!content.trim()) return;
+
+            const destination = `/app/chat.sendMessage/${roomId}`;
+            const message = {
+                chatRoomId: roomId,
+                roomId: roomId,
+                id: roomId,
+                room_id: roomId,
+                chat_room_id: roomId,
+                content: content,
+                contentType: contentType,
+                type: 'CHAT',
+                timestamp: new Date().toISOString()
+            };
+
+            stompClient.publish({
+                destination: destination,
+                body: JSON.stringify(message),
+                headers: { 'content-type': 'application/json' }
+            });
+
+            addSentMessage(message);
+            messageInput.value = '';
+        });
+
+        // Send raw STOMP frame
+        sendRawBtn.addEventListener('click', () => {
+            if (!stompClient || !stompClient.connected) return;
+
+            try {
+                const destination = destinationInput.value;
+                const headers = JSON.parse(headersInput.value);
+                const payload = payloadInput.value;
+
+                stompClient.publish({
+                    destination: destination,
+                    body: payload,
+                    headers: headers
+                });
+
+                addRawMessage('SENT', { destination, ...headers }, payload);
+            } catch (e) {
+                addRawMessage('ERROR', {}, e.message);
+            }
+        });
+
+        // Enter key to send message
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendBtn.click();
+            }
+        });
+
+        // Helper functions
+        function resetButtons() {
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            subscribeBtn.disabled = true;
+            joinRoomBtn.disabled = true;
+            leaveRoomBtn.disabled = true;
+            messageInput.disabled = true;
+            sendBtn.disabled = true;
+            sendRawBtn.disabled = true;
+        }
+
+        function addSystemMessage(text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message system';
+            messageDiv.textContent = text;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addSentMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message sent';
+
+            const typeSpan = document.createElement('span');
+            typeSpan.style.fontWeight = 'bold';
+            typeSpan.textContent = message.type;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.textContent = message.content;
+
+            const timeDiv = document.createElement('div');
+            timeDiv.style.fontSize = 'small';
+            timeDiv.style.color = '#666';
+            timeDiv.textContent = new Date().toLocaleTimeString();
+
+            messageDiv.appendChild(typeSpan);
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addReceivedMessage(message) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message received';
+
+            const typeSpan = document.createElement('span');
+            typeSpan.style.fontWeight = 'bold';
+            typeSpan.textContent = message.type;
+
+            const senderDiv = document.createElement('div');
+            senderDiv.style.fontStyle = 'italic';
+            senderDiv.textContent = `From: ${message.senderId || 'Unknown'}`;
+
+            const contentDiv = document.createElement('div');
+            contentDiv.textContent = message.content;
+
+            const timeDiv = document.createElement('div');
+            timeDiv.style.fontSize = 'small';
+            timeDiv.style.color = '#666';
+            timeDiv.textContent = message.timestamp
+                ? new Date(message.timestamp).toLocaleTimeString()
+                : new Date().toLocaleTimeString();
+
+            messageDiv.appendChild(typeSpan);
+            messageDiv.appendChild(senderDiv);
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timeDiv);
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addRawMessage(type, headers, body) {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.marginBottom = '10px';
+            messageDiv.style.borderBottom = '1px solid #eee';
+            messageDiv.style.paddingBottom = '5px';
+
+            const typeDiv = document.createElement('div');
+            typeDiv.style.fontWeight = 'bold';
+            typeDiv.textContent = `${type} (${new Date().toLocaleTimeString()})`;
+
+            const headersDiv = document.createElement('div');
+            headersDiv.style.color = '#0066cc';
+            headersDiv.textContent = JSON.stringify(headers, null, 2);
+
+            const bodyDiv = document.createElement('div');
+            bodyDiv.style.color = '#006600';
+            bodyDiv.textContent = body;
+
+            messageDiv.appendChild(typeDiv);
+            messageDiv.appendChild(headersDiv);
+            messageDiv.appendChild(bodyDiv);
+
+            rawMessagesContainer.appendChild(messageDiv);
+            rawMessagesContainer.scrollTop = rawMessagesContainer.scrollHeight;
+        }
+    </script>
+</body>
+</html>

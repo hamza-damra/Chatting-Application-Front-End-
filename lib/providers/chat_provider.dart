@@ -10,12 +10,16 @@ import '../services/websocket_service.dart';
 import '../models/user_model.dart';
 import '../utils/logger.dart';
 import '../providers/api_auth_provider.dart';
+import '../models/unread_message_notification.dart';
 import '../utils/url_utils.dart';
 
 class ChatProvider with ChangeNotifier {
   final ApiChatService _chatService;
   final WebSocketService _webSocketService;
   final ApiAuthProvider _authProvider;
+
+  // Optional notification provider for rich notifications
+  Function(UnreadMessageNotification)? _onNotificationReceived;
 
   List<types.Room> _rooms = [];
   final Map<String, List<types.Message>> _messages = {};
@@ -48,28 +52,40 @@ class ChatProvider with ChangeNotifier {
 
   // Helper method to convert types.Room to ChatRoom
   ChatRoom _convertTypesRoomToChatRoom(types.Room room) {
+    // Use calculated unread count based on actual message statuses
+    final unreadCount = getUnreadCount(room.id);
+
     return ChatRoom(
       id: int.parse(room.id),
       name: room.name,
       description: room.metadata?['description'] as String?,
       isPrivate: room.type == types.RoomType.direct,
       lastMessageId: null, // Not available in types.Room
-      lastActivity: null, // Not available in types.Room
-      unreadCount: _unreadMessageCounts[room.id] ?? 0,
+      lastActivity:
+          room.metadata?['lastMessageTime'] != null
+              ? DateTime.tryParse(room.metadata!['lastMessageTime'] as String)
+              : null,
+      unreadCount: unreadCount,
       participantIds: room.users.map((user) => int.parse(user.id)).toList(),
     );
   }
 
   // Public method to convert types.Room to ChatRoom
   ChatRoom convertRoomToChatRoom(types.Room room) {
+    // Use calculated unread count based on actual message statuses
+    final unreadCount = getUnreadCount(room.id);
+
     return ChatRoom(
       id: int.parse(room.id),
       name: room.name ?? '',
       description: room.metadata?['description'] as String?,
       isPrivate: room.type == types.RoomType.direct,
       lastMessageId: null,
-      lastActivity: null,
-      unreadCount: _unreadMessageCounts[room.id] ?? 0,
+      lastActivity:
+          room.metadata?['lastMessageTime'] != null
+              ? DateTime.tryParse(room.metadata!['lastMessageTime'] as String)
+              : null,
+      unreadCount: unreadCount,
       participantIds: room.users.map((user) => int.parse(user.id)).toList(),
     );
   }
@@ -289,18 +305,194 @@ class ChatProvider with ChangeNotifier {
   }
 
   Future<void> markMessagesAsRead(String roomId) async {
-    await _chatService.markMessagesAsRead(
-      roomId: int.parse(roomId),
-      userId: currentUserId,
-    );
+    try {
+      AppLogger.i('ChatProvider', 'Marking messages as read for room $roomId');
+
+      // Clear unread count immediately for better UX
+      _unreadMessageCounts[roomId] = 0;
+
+      // Mark all messages from other users as read in local storage
+      final messages = _messages[roomId] ?? [];
+      final currentUserIdStr = _authProvider.user?.id.toString();
+
+      for (int i = 0; i < messages.length; i++) {
+        final message = messages[i];
+        // Only mark messages from other users as read
+        if (message.author.id != currentUserIdStr &&
+            message.status != types.Status.seen) {
+          // Update the message status to seen (read) using existing method
+          _updateMessageStatus(roomId, message.id, types.Status.seen);
+        }
+      }
+
+      // Notify listeners immediately to update UI
+      notifyListeners();
+
+      // Mark messages as read on the server (async, non-blocking)
+      _chatService
+          .markMessagesAsRead(roomId: int.parse(roomId), userId: currentUserId)
+          .then((_) {
+            AppLogger.i(
+              'ChatProvider',
+              'Successfully marked messages as read on server for room $roomId',
+            );
+          })
+          .catchError((e) {
+            AppLogger.e(
+              'ChatProvider',
+              'Error marking messages as read on server for room $roomId: $e',
+            );
+          });
+    } catch (e) {
+      AppLogger.e(
+        'ChatProvider',
+        'Error marking messages as read for room $roomId: $e',
+      );
+      // Don't rethrow to prevent UI issues, but log the error
+    }
+  }
+
+  // Clear unread count for a specific room
+  void clearUnreadCount(String roomId) {
+    if (_unreadMessageCounts.containsKey(roomId) &&
+        _unreadMessageCounts[roomId]! > 0) {
+      _unreadMessageCounts[roomId] = 0;
+      notifyListeners();
+      AppLogger.i('ChatProvider', 'Cleared unread count for room $roomId');
+    }
+  }
+
+  // Reset all unread counts
+  void resetAllUnreadCounts() {
+    _unreadMessageCounts.clear();
+    // Use microtask to ensure we're not in a build cycle
+    Future.microtask(() {
+      notifyListeners();
+    });
+    AppLogger.i('ChatProvider', 'Reset all unread counts');
+  }
+
+  // Force refresh unread counts and notify listeners
+  void refreshUnreadCounts() {
+    AppLogger.i('ChatProvider', 'Force refreshing unread counts');
     notifyListeners();
+  }
+
+  // Get total unread count across all rooms
+  int get totalUnreadCount {
+    return _unreadMessageCounts.values.fold(0, (sum, count) => sum + count);
+  }
+
+  // Debug method to log current unread counts
+  void debugLogUnreadCounts() {
+    AppLogger.i('ChatProvider', 'Current unread counts:');
+    for (final entry in _unreadMessageCounts.entries) {
+      AppLogger.i('ChatProvider', '  Room ${entry.key}: ${entry.value}');
+    }
+    AppLogger.i('ChatProvider', 'Total unread count: $totalUnreadCount');
+  }
+
+  // Clear the currently selected room
+  void clearSelectedRoom() {
+    if (_selectedRoom != null) {
+      AppLogger.i(
+        'ChatProvider',
+        'Clearing selected room: ${_selectedRoom!.id}',
+      );
+      _selectedRoom = null;
+      notifyListeners();
+    }
   }
 
   bool get isLoading => _isLoading;
   String? get error => _error;
   types.Room? get selectedRoom => _selectedRoom;
   List<UserModel> get users => _users;
-  int getUnreadCount(String roomId) => _unreadMessageCounts[roomId] ?? 0;
+  int getUnreadCount(String roomId) {
+    // Debug log the request
+    AppLogger.d('ChatProvider', 'Getting unread count for room: $roomId');
+    AppLogger.d(
+      'ChatProvider',
+      'Available unread counts: $_unreadMessageCounts',
+    );
+    AppLogger.d('ChatProvider', 'Selected room: ${_selectedRoom?.id}');
+
+    // If we have a stored count and the room is not currently selected, use it
+    // This prevents recalculation issues when leaving rooms
+    if (_unreadMessageCounts.containsKey(roomId)) {
+      final storedCount = _unreadMessageCounts[roomId]!;
+
+      // If this is the currently selected room, it should always be 0
+      if (_selectedRoom?.id == roomId) {
+        AppLogger.d('ChatProvider', 'Room $roomId is selected, returning 0');
+        return 0;
+      }
+
+      // For non-selected rooms, use the stored count
+      AppLogger.d(
+        'ChatProvider',
+        'Returning stored count for room $roomId: $storedCount',
+      );
+      return storedCount;
+    }
+
+    // Fallback to calculated count only if no stored count exists
+    final calculatedCount = _calculateActualUnreadCount(roomId);
+    return calculatedCount >= 0 ? calculatedCount : 0;
+  }
+
+  // Calculate actual unread count based on message statuses
+  int _calculateActualUnreadCount(String roomId) {
+    try {
+      final messages = _messages[roomId] ?? [];
+
+      if (messages.isEmpty) {
+        return 0;
+      }
+
+      int unreadCount = 0;
+      final currentUserId = _authProvider.user?.id.toString();
+
+      for (final message in messages) {
+        // Only count messages from other users
+        if (message.author.id != currentUserId) {
+          // Count messages that are not read by current user
+          if (message.status != types.Status.seen) {
+            unreadCount++;
+          }
+        }
+      }
+
+      AppLogger.d(
+        'ChatProvider',
+        'Calculated unread count for room $roomId: $unreadCount (from ${messages.length} messages)',
+      );
+
+      return unreadCount;
+    } catch (e) {
+      AppLogger.e(
+        'ChatProvider',
+        'Error calculating unread count for room $roomId: $e',
+      );
+      return -1; // Return -1 to indicate calculation failed
+    }
+  }
+
+  // Recalculate and update unread count for a room
+  void _recalculateUnreadCount(String roomId) {
+    final calculatedCount = _calculateActualUnreadCount(roomId);
+    if (calculatedCount >= 0) {
+      final previousCount = _unreadMessageCounts[roomId] ?? 0;
+      _unreadMessageCounts[roomId] = calculatedCount;
+
+      if (previousCount != calculatedCount) {
+        AppLogger.i(
+          'ChatProvider',
+          'Updated unread count for room $roomId: $previousCount -> $calculatedCount',
+        );
+      }
+    }
+  }
 
   // Constructor
   ChatProvider({
@@ -318,6 +510,52 @@ class ChatProvider with ChangeNotifier {
     await _loadRooms();
     await _loadUsers();
     await _webSocketService.connect();
+
+    // Subscribe to real-time unread message updates
+    _subscribeToUnreadUpdates();
+
+    // Subscribe to rich unread message notifications
+    _subscribeToUnreadNotifications();
+  }
+
+  // Set up notification callback (called from main app)
+  void setNotificationCallback(Function(UnreadMessageNotification) callback) {
+    _onNotificationReceived = callback;
+  }
+
+  // Subscribe to rich unread message notifications
+  void _subscribeToUnreadNotifications() {
+    try {
+      AppLogger.i(
+        'ChatProvider',
+        'Setting up unread notification subscription...',
+      );
+      _webSocketService.subscribeToUnreadNotifications(
+        onNotificationReceived: (notification) {
+          AppLogger.i(
+            'ChatProvider',
+            'Received rich notification: ${notification.senderUsername} in ${notification.chatRoomName}',
+          );
+
+          // Forward to notification provider if callback is set
+          if (_onNotificationReceived != null) {
+            AppLogger.i('ChatProvider', 'Forwarding notification to provider');
+            _onNotificationReceived!(notification);
+          } else {
+            AppLogger.w(
+              'ChatProvider',
+              'No notification callback set, notification will be ignored',
+            );
+          }
+        },
+      );
+      AppLogger.i('ChatProvider', 'Unread notification subscription completed');
+    } catch (e) {
+      AppLogger.e(
+        'ChatProvider',
+        'Error subscribing to unread notifications: $e',
+      );
+    }
   }
 
   // Load all users
@@ -343,6 +581,161 @@ class ChatProvider with ChangeNotifier {
     await _loadUsers();
   }
 
+  // Subscribe to real-time unread message updates
+  void _subscribeToUnreadUpdates() {
+    try {
+      AppLogger.i('ChatProvider', 'Subscribing to real-time unread updates');
+
+      // Subscribe to unread count updates
+      _webSocketService.subscribeToUnreadUpdates(
+        onUnreadUpdate: (unreadData) {
+          _handleUnreadUpdate(unreadData);
+        },
+      );
+
+      // Request initial unread counts
+      _requestInitialUnreadCounts();
+
+      AppLogger.i('ChatProvider', 'Successfully subscribed to unread updates');
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error subscribing to unread updates: $e');
+    }
+  }
+
+  // Handle real-time unread count updates
+  void _handleUnreadUpdate(Map<String, dynamic> unreadData) {
+    try {
+      final chatRoomId = unreadData['chatRoomId']?.toString();
+      final unreadCount = unreadData['unreadCount'] as int? ?? 0;
+      final updateType = unreadData['updateType'] as String?;
+      final totalUnreadCount = unreadData['totalUnreadCount'] as int? ?? 0;
+
+      AppLogger.i(
+        'ChatProvider',
+        'Received real-time unread update: $unreadData',
+      );
+
+      if (chatRoomId != null) {
+        // Update the unread count for the specific room
+        final previousCount = _unreadMessageCounts[chatRoomId] ?? 0;
+        _unreadMessageCounts[chatRoomId] = unreadCount;
+
+        AppLogger.i(
+          'ChatProvider',
+          'Real-time unread update: Room $chatRoomId: $previousCount -> $unreadCount (Type: $updateType)',
+        );
+
+        // Update room metadata if available
+        if (unreadData.containsKey('latestMessageContent')) {
+          _updateRoomLatestMessage(chatRoomId, unreadData);
+        }
+
+        // Notify listeners to update UI
+        AppLogger.i('ChatProvider', 'Notifying listeners after unread update');
+        notifyListeners();
+
+        // Debug log current state after update
+        debugLogUnreadCounts();
+
+        // Log total unread count for debugging
+        AppLogger.d(
+          'ChatProvider',
+          'Total unread count across all rooms: $totalUnreadCount',
+        );
+      } else {
+        AppLogger.w(
+          'ChatProvider',
+          'Received unread update with null chatRoomId',
+        );
+      }
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error handling unread update: $e');
+    }
+  }
+
+  // Update room's latest message information
+  void _updateRoomLatestMessage(String roomId, Map<String, dynamic> data) {
+    try {
+      final roomIndex = _rooms.indexWhere((room) => room.id == roomId);
+      if (roomIndex != -1) {
+        final room = _rooms[roomIndex];
+        final updatedMetadata = Map<String, dynamic>.from(room.metadata ?? {});
+
+        // Update latest message information
+        if (data.containsKey('latestMessageContent')) {
+          updatedMetadata['lastMessage'] = data['latestMessageContent'];
+        }
+        if (data.containsKey('timestamp')) {
+          updatedMetadata['lastMessageTime'] = data['timestamp'];
+        }
+        if (data.containsKey('latestMessageSender')) {
+          updatedMetadata['lastMessageSender'] = data['latestMessageSender'];
+        }
+
+        // Update unread count in metadata
+        updatedMetadata['unreadCount'] = data['unreadCount'] ?? 0;
+
+        // Create updated room
+        final updatedRoom = types.Room(
+          id: room.id,
+          type: room.type,
+          users: room.users,
+          name: room.name,
+          imageUrl: room.imageUrl,
+          createdAt: room.createdAt,
+          updatedAt: DateTime.now().millisecondsSinceEpoch,
+          metadata: updatedMetadata,
+        );
+
+        // Replace the room in the list
+        _rooms[roomIndex] = updatedRoom;
+
+        AppLogger.d('ChatProvider', 'Updated latest message for room $roomId');
+      }
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error updating room latest message: $e');
+    }
+  }
+
+  // Request initial unread counts from server
+  void _requestInitialUnreadCounts() {
+    try {
+      AppLogger.i('ChatProvider', 'Requesting initial unread counts');
+      _webSocketService.requestUnreadCounts();
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error requesting initial unread counts: $e');
+    }
+  }
+
+  // Mark entire room as read via WebSocket
+  Future<void> markRoomAsRead(String roomId) async {
+    try {
+      AppLogger.i('ChatProvider', 'Marking room $roomId as read via WebSocket');
+
+      // Clear unread count immediately for better UX
+      _unreadMessageCounts[roomId] = 0;
+      notifyListeners();
+
+      // Send mark as read request via WebSocket
+      final success = await _webSocketService.markRoomAsRead(int.parse(roomId));
+
+      if (success) {
+        AppLogger.i('ChatProvider', 'Successfully marked room $roomId as read');
+      } else {
+        AppLogger.w(
+          'ChatProvider',
+          'Failed to mark room $roomId as read via WebSocket',
+        );
+        // Fallback to REST API
+        await markMessagesAsRead(roomId);
+      }
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error marking room as read: $e');
+      // Fallback to REST API
+      await markMessagesAsRead(roomId);
+    }
+  }
+
   @override
   void dispose() {
     // Disconnect WebSocket
@@ -354,10 +747,79 @@ class ChatProvider with ChangeNotifier {
   Future<void> _loadRooms() async {
     try {
       _rooms = await _chatService.getChatRooms();
+
+      // Sync unread counts from server data
+      _syncUnreadCountsFromServer();
+
       _error = null;
     } catch (e) {
       _error = e.toString();
       rethrow;
+    }
+  }
+
+  // Sync unread counts from server metadata
+  void _syncUnreadCountsFromServer() {
+    for (final room in _rooms) {
+      final serverUnreadCount = room.metadata?['unreadCount'] as int? ?? 0;
+      if (serverUnreadCount > 0) {
+        _unreadMessageCounts[room.id] = serverUnreadCount;
+        AppLogger.i(
+          'ChatProvider',
+          'Synced unread count for room ${room.id}: $serverUnreadCount',
+        );
+      }
+    }
+  }
+
+  // Sync unread counts from ChatRoomModel data (for ChatBloc integration)
+  void syncUnreadCountsFromChatRooms(List<dynamic> chatRooms) {
+    try {
+      for (final room in chatRooms) {
+        String roomId;
+        int unreadCount = 0;
+
+        // Handle both ChatRoomModel and other room types
+        if (room is Map<String, dynamic>) {
+          roomId = room['id']?.toString() ?? '';
+          unreadCount = room['unreadCount'] as int? ?? 0;
+        } else {
+          // Use reflection or dynamic access for other types
+          try {
+            roomId = (room as dynamic).id?.toString() ?? '';
+            unreadCount = (room as dynamic).unreadCount as int? ?? 0;
+          } catch (e) {
+            AppLogger.w(
+              'ChatProvider',
+              'Could not extract room data from $room: $e',
+            );
+            continue;
+          }
+        }
+
+        if (roomId.isNotEmpty) {
+          final previousCount = _unreadMessageCounts[roomId] ?? 0;
+          _unreadMessageCounts[roomId] = unreadCount;
+
+          if (previousCount != unreadCount) {
+            AppLogger.i(
+              'ChatProvider',
+              'Synced unread count for room $roomId: $previousCount -> $unreadCount',
+            );
+          }
+        }
+      }
+
+      // Notify listeners to update UI
+      notifyListeners();
+
+      // Debug log current state
+      debugLogUnreadCounts();
+    } catch (e) {
+      AppLogger.e(
+        'ChatProvider',
+        'Error syncing unread counts from chat rooms: $e',
+      );
     }
   }
 
@@ -391,13 +853,16 @@ class ChatProvider with ChangeNotifier {
         },
       );
 
+      // Clear unread count immediately when entering a room
+      _unreadMessageCounts[existingRoom.id] = 0;
+
       // Load messages for this room
       await _loadMessages(existingRoom.id);
 
       // Subscribe to real-time messages for this room
       _subscribeToRoomMessages(existingRoom.id);
 
-      // Mark messages as read when selecting a room
+      // Mark messages as read when selecting a room (async, non-blocking)
       markMessagesAsRead(existingRoom.id);
 
       notifyListeners();
@@ -425,6 +890,9 @@ class ChatProvider with ChangeNotifier {
       // This ensures messages appear in chronological order in the chat UI
       // The API might return messages in reverse order (newest first), so we need to reverse them
       _messages[roomId] = List.from(messages.reversed);
+
+      // Recalculate unread count based on actual message statuses
+      _recalculateUnreadCount(roomId);
 
       AppLogger.i(
         'ChatProvider',
@@ -663,8 +1131,17 @@ class ChatProvider with ChangeNotifier {
 
             // If this is not the currently selected room and not from current user, increment unread count
             if (_selectedRoom?.id != roomId && !isFromCurrentUser) {
-              _unreadMessageCounts[roomId] =
-                  (_unreadMessageCounts[roomId] ?? 0) + 1;
+              final previousCount = _unreadMessageCounts[roomId] ?? 0;
+              _unreadMessageCounts[roomId] = previousCount + 1;
+              AppLogger.i(
+                'ChatProvider',
+                'Incremented unread count for room $roomId: $previousCount -> ${_unreadMessageCounts[roomId]}',
+              );
+            } else {
+              AppLogger.d(
+                'ChatProvider',
+                'Not incrementing unread count for room $roomId: selectedRoom=${_selectedRoom?.id}, isFromCurrentUser=$isFromCurrentUser',
+              );
             }
           }
 
@@ -711,6 +1188,24 @@ class ChatProvider with ChangeNotifier {
         'ChatProvider',
         'Removed room $roomId from active subscriptions. Remaining: $_activeSubscriptions',
       );
+
+      // Clear selected room if we're leaving the currently selected room
+      if (_selectedRoom?.id == roomId) {
+        _selectedRoom = null;
+        AppLogger.i(
+          'ChatProvider',
+          'Cleared selected room $roomId when unsubscribing',
+        );
+      }
+
+      // Ensure unread count is 0 when leaving a room (user has seen all messages)
+      if (_unreadMessageCounts.containsKey(roomId)) {
+        _unreadMessageCounts[roomId] = 0;
+        AppLogger.i(
+          'ChatProvider',
+          'Cleared unread count for room $roomId when unsubscribing',
+        );
+      }
 
       // Notify the server that we're leaving this room
       _webSocketService.leaveChatRoom(int.parse(roomId)).then((success) {

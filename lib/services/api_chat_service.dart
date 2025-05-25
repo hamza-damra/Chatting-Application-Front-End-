@@ -558,6 +558,9 @@ class ApiChatService {
         }
       }
 
+      // Extract unread count if available
+      final unreadCount = data['unreadCount'] ?? 0;
+
       return types.Room(
         id: data['id'].toString(),
         type: isPrivate ? types.RoomType.direct : types.RoomType.group,
@@ -566,6 +569,11 @@ class ApiChatService {
         imageUrl: data['imageUrl'],
         createdAt: createdAt,
         updatedAt: updatedAt,
+        metadata: {
+          'unreadCount': unreadCount,
+          'lastMessage': data['lastMessage'],
+          'lastMessageTime': data['lastMessageTime'],
+        },
       );
     } catch (e) {
       AppLogger.e('ApiChatService', 'Error in _mapApiRoomToRoom: $e');

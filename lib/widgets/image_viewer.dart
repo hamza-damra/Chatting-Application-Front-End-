@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:provider/provider.dart';
 import '../utils/url_utils.dart';
-import '../utils/logger.dart';
+
 import '../core/services/token_service.dart';
 import 'authenticated_image_provider.dart';
 import 'shimmer_widgets.dart';

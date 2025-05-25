@@ -4,6 +4,7 @@ import 'package:chatting_application/models/message.dart';
 import 'package:chatting_application/providers/api_auth_provider.dart';
 import 'package:chatting_application/providers/chat_provider.dart';
 import 'package:chatting_application/services/improved_file_upload_service.dart';
+import 'package:chatting_application/services/websocket_service.dart' as ws;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -21,9 +22,10 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   late final ChatProvider _chatProvider;
   late final ImprovedFileUploadService _uploadService;
+  late final ws.WebSocketService _webSocketService;
   late final int _currentUserId;
 
   bool _isLoading = true;
@@ -32,10 +34,13 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
 
   String get _roomIdString => widget.chatRoom.id.toString();
+  int get _roomId => widget.chatRoom.id;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+
     // Initialize providers after first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _chatProvider = Provider.of<ChatProvider>(context, listen: false);
@@ -43,24 +48,61 @@ class _ChatScreenState extends State<ChatScreen> {
         context,
         listen: false,
       );
+      _webSocketService = Provider.of<ws.WebSocketService>(
+        context,
+        listen: false,
+      );
       final auth = Provider.of<ApiAuthProvider>(context, listen: false);
       _currentUserId = auth.user?.id ?? 0;
 
       _loadMessages();
-      _markMessagesAsRead();
       _setupWebSocketListener();
+
+      // Mark user as active in this room
+      _webSocketService.enterRoom(_roomId);
     });
   }
 
   @override
   void dispose() {
+    // Mark user as inactive in this room
+    _webSocketService.leaveRoom(_roomId);
+
+    // Clear unread count immediately when leaving the chat screen
+    _chatProvider.clearUnreadCount(_roomIdString);
+
     // Unsubscribe from room messages when leaving the chat screen
     _chatProvider.unsubscribeFromRoom(_roomIdString);
+
+    // Remove lifecycle observer
+    WidgetsBinding.instance.removeObserver(this);
+
     AppLogger.i(
       'ChatScreen',
       'Unsubscribed from room $_roomIdString on dispose',
     );
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        // App is backgrounded, leave room
+        _webSocketService.leaveRoom(_roomId);
+        AppLogger.i('ChatScreen', 'App backgrounded, left room $_roomId');
+        break;
+      case AppLifecycleState.resumed:
+        // App is foregrounded, re-enter room
+        _webSocketService.enterRoom(_roomId);
+        AppLogger.i('ChatScreen', 'App resumed, entered room $_roomId');
+        break;
+      default:
+        break;
+    }
   }
 
   void _setupWebSocketListener() {
@@ -226,14 +268,6 @@ class _ChatScreenState extends State<ChatScreen> {
               ? DateTime.fromMillisecondsSinceEpoch(typesMsg.createdAt!)
               : DateTime.now(),
     );
-  }
-
-  Future<void> _markMessagesAsRead() async {
-    try {
-      await _chatProvider.markMessagesAsRead(_roomIdString);
-    } catch (e) {
-      AppLogger.e('ChatScreen', 'Error marking messages as read: $e');
-    }
   }
 
   @override

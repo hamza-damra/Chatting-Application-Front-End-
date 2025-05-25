@@ -155,19 +155,6 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     });
   }
 
-  void _handleUploadComplete(String url, String contentType) {
-    setState(() {
-      _isUploading = false;
-      _uploadProgress = 0.0;
-    });
-    widget.onSendAttachment(url, contentType);
-
-    // Use a small delay to ensure the message is added to the list before scrolling
-    Future.delayed(const Duration(milliseconds: 50), () {
-      _scrollToBottom();
-    });
-  }
-
   void _handleUploadError(String error) {
     setState(() {
       _isUploading = false;
@@ -264,26 +251,6 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       );
     } catch (e) {
       AppLogger.e('CustomChatWidgetNew', 'Error uploading video: $e');
-      _handleUploadError(e.toString());
-    }
-  }
-
-  Future<void> _pickAndUploadAudio() async {
-    setState(() {
-      _isUploading = true;
-      _currentFileName = 'audio';
-      _isAttachmentMenuOpen = false;
-    });
-
-    try {
-      final result = await widget.webSocketService.pickAndUploadAudio(
-        roomId: widget.roomId,
-        onProgress: _handleProgress,
-      );
-
-      _handleUploadComplete(result.url, result.contentType);
-    } catch (e) {
-      AppLogger.e('CustomChatWidgetNew', 'Error uploading audio: $e');
       _handleUploadError(e.toString());
     }
   }
@@ -459,71 +426,6 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       onFilePressed: _pickAndUploadDocument,
       isEnabled: !_isUploading,
       isUploading: _isUploading,
-    );
-  }
-
-  Widget _buildAttachmentMenu() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          _buildAttachmentButton(
-            icon: Icons.camera_alt,
-            label: 'Camera',
-            onTap: _captureAndUploadImage,
-          ),
-          _buildAttachmentButton(
-            icon: Icons.image,
-            label: 'Image',
-            onTap: _pickAndUploadImage,
-          ),
-          _buildAttachmentButton(
-            icon: Icons.videocam,
-            label: 'Video',
-            onTap: _pickAndUploadVideo,
-          ),
-          _buildAttachmentButton(
-            icon: Icons.audiotrack,
-            label: 'Audio',
-            onTap: _pickAndUploadAudio,
-          ),
-          _buildAttachmentButton(
-            icon: Icons.insert_drive_file,
-            label: 'Document',
-            onTap: _pickAndUploadDocument,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAttachmentButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        InkWell(
-          onTap: _isUploading ? null : onTap,
-          borderRadius: BorderRadius.circular(30),
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 24),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 12, color: Colors.black87),
-        ),
-      ],
     );
   }
 
@@ -841,14 +743,14 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                 decoration: BoxDecoration(
                   color:
                       isCurrentUser
-                          ? Colors.white.withOpacity(0.15)
+                          ? Colors.white.withValues(alpha: 0.15)
                           : Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color:
                         isCurrentUser
-                            ? Colors.white.withOpacity(0.3)
-                            : Colors.grey.withOpacity(0.3),
+                            ? Colors.white.withValues(alpha: 0.3)
+                            : Colors.grey.withValues(alpha: 0.3),
                     width: 1,
                   ),
                 ),
@@ -862,10 +764,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                           decoration: BoxDecoration(
                             color:
                                 isCurrentUser
-                                    ? Colors.white.withOpacity(0.2)
+                                    ? Colors.white.withValues(alpha: 0.2)
                                     : Theme.of(
                                       context,
-                                    ).primaryColor.withOpacity(0.1),
+                                    ).primaryColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
@@ -903,7 +805,9 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                                     fontSize: 12,
                                     color:
                                         isCurrentUser
-                                            ? Colors.white.withOpacity(0.8)
+                                            ? Colors.white.withValues(
+                                              alpha: 0.8,
+                                            )
                                             : Colors.grey[600],
                                   ),
                                 ),
@@ -916,7 +820,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                           size: 18,
                           color:
                               isCurrentUser
-                                  ? Colors.white.withOpacity(0.8)
+                                  ? Colors.white.withValues(alpha: 0.8)
                                   : Colors.grey[600],
                         ),
                       ],
@@ -930,10 +834,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                       decoration: BoxDecoration(
                         color:
                             isCurrentUser
-                                ? Colors.white.withOpacity(0.2)
+                                ? Colors.white.withValues(alpha: 0.2)
                                 : Theme.of(
                                   context,
-                                ).primaryColor.withOpacity(0.1),
+                                ).primaryColor.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
@@ -944,7 +848,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                             size: 14,
                             color:
                                 isCurrentUser
-                                    ? Colors.white.withOpacity(0.9)
+                                    ? Colors.white.withValues(alpha: 0.9)
                                     : Theme.of(context).primaryColor,
                           ),
                           const SizedBox(width: 4),
@@ -955,7 +859,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                               fontWeight: FontWeight.w500,
                               color:
                                   isCurrentUser
-                                      ? Colors.white.withOpacity(0.9)
+                                      ? Colors.white.withValues(alpha: 0.9)
                                       : Theme.of(context).primaryColor,
                             ),
                           ),

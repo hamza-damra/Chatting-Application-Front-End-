@@ -22,7 +22,6 @@ class MediaPreviewScreen extends StatefulWidget {
 class _MediaPreviewScreenState extends State<MediaPreviewScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
-  double _loadProgress = 0.0;
 
   @override
   void initState() {
@@ -37,14 +36,8 @@ class _MediaPreviewScreenState extends State<MediaPreviewScreen> {
         _errorMessage = '';
       });
 
-      // Simulate loading progress
-      for (int i = 1; i <= 10; i++) {
-        if (!mounted) return;
-        await Future.delayed(const Duration(milliseconds: 100));
-        setState(() {
-          _loadProgress = i / 10;
-        });
-      }
+      // Simulate loading delay
+      await Future.delayed(const Duration(milliseconds: 1000));
 
       setState(() {
         _isLoading = false;

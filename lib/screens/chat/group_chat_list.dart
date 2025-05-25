@@ -135,69 +135,76 @@ class _GroupChatListState extends State<GroupChatList> {
   }
 
   Widget _buildChatRoomItem(ChatRoom room) {
-    final unreadCount = widget.chatProvider.getUnreadCount(room.id.toString());
-    final apiAuthProvider = Provider.of<ApiAuthProvider>(
-      context,
-      listen: false,
-    );
+    return Consumer<ChatProvider>(
+      builder: (context, chatProvider, child) {
+        final unreadCount = chatProvider.getUnreadCount(room.id.toString());
+        final apiAuthProvider = Provider.of<ApiAuthProvider>(
+          context,
+          listen: false,
+        );
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      elevation: 2,
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: Theme.of(context).primaryColor,
-          child: Text(
-            room.name?.substring(0, 1).toUpperCase() ?? 'G',
-            style: const TextStyle(color: Colors.white),
-          ),
-        ),
-        title: Text(
-          room.name ?? 'Group Chat',
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(
-          '${room.participantIds.length} members${room.description != null ? ' • ${room.description}' : ''}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing:
-            unreadCount > 0
-                ? Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    unreadCount.toString(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                )
-                : const Icon(Icons.arrow_forward_ios, size: 16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder:
-                  (context) => MultiProvider(
-                    providers: [
-                      ChangeNotifierProvider.value(value: widget.chatProvider),
-                      Provider.value(value: widget.webSocketService),
-                      ChangeNotifierProvider.value(value: apiAuthProvider),
-                    ],
-                    child: ChatScreen(chatRoom: room),
-                  ),
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          elevation: 2,
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: Theme.of(context).primaryColor,
+              child: Text(
+                room.name?.substring(0, 1).toUpperCase() ?? 'G',
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
-          ).then((_) {
-            // Refresh the list when returning from chat screen
-            _loadGroupChats();
-          });
-        },
-      ),
+            title: Text(
+              room.name ?? 'Group Chat',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            subtitle: Text(
+              '${room.participantIds.length} members${room.description != null ? ' • ${room.description}' : ''}',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            trailing:
+                unreadCount > 0
+                    ? Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).primaryColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Text(
+                        unreadCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                    : const Icon(Icons.arrow_forward_ios, size: 16),
+            onTap: () {
+              // Mark room as read via WebSocket for real-time updates (non-blocking)
+              chatProvider.markRoomAsRead(room.id.toString());
+
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder:
+                      (context) => MultiProvider(
+                        providers: [
+                          ChangeNotifierProvider.value(value: chatProvider),
+                          Provider.value(value: widget.webSocketService),
+                          ChangeNotifierProvider.value(value: apiAuthProvider),
+                        ],
+                        child: ChatScreen(chatRoom: room),
+                      ),
+                ),
+              ).then((_) {
+                // Refresh the list when returning from chat screen
+                _loadGroupChats();
+              });
+            },
+          ),
+        );
+      },
     );
   }
 }

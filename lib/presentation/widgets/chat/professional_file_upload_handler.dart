@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -16,8 +15,8 @@ class ProfessionalFileUploadHandler {
     required this.chatRoomId,
     required ApiFileService apiFileService,
     required WebSocketService webSocketService,
-  })  : _apiFileService = apiFileService,
-        _webSocketService = webSocketService;
+  }) : _apiFileService = apiFileService,
+       _webSocketService = webSocketService;
 
   /// Pick and upload an image from gallery
   Future<void> pickAndUploadImage({
@@ -113,7 +112,16 @@ class ProfessionalFileUploadHandler {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'],
+        allowedExtensions: [
+          'pdf',
+          'txt',
+          'doc',
+          'docx',
+          'xls',
+          'xlsx',
+          'ppt',
+          'pptx',
+        ],
         allowMultiple: false,
       );
 
@@ -126,7 +134,10 @@ class ProfessionalFileUploadHandler {
         );
       }
     } catch (e) {
-      AppLogger.e('ProfessionalFileUploadHandler', 'Error picking document: $e');
+      AppLogger.e(
+        'ProfessionalFileUploadHandler',
+        'Error picking document: $e',
+      );
       onError('Failed to pick document: $e');
     }
   }

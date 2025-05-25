@@ -68,6 +68,8 @@ dependencies:
   file_picker: ^10.1.9
   photo_view: ^0.15.0
   shimmer: ^3.0.0
+  # Local notifications for unread messages
+  flutter_local_notifications: ^17.0.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -6,6 +6,7 @@ import 'shimmer_test_screen.dart';
 import 'media_gallery_screen.dart';
 import 'storage_stats_screen.dart';
 import 'debug_screen.dart';
+import 'notification_test_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -180,6 +181,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               context,
               MaterialPageRoute(
                 builder: (context) => const ShimmerTestScreen(),
+              ),
+            );
+          },
+        ),
+        _buildSettingCard(
+          icon: Icons.notifications_active,
+          title: 'Notification Test',
+          subtitle: 'Test notification system and permissions',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const NotificationTestScreen(),
               ),
             );
           },

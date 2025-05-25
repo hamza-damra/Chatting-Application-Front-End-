@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:provider/provider.dart';
 import '../../../presentation/blocs/chat/chat_bloc.dart';
 import '../../../presentation/blocs/chat/chat_event.dart';
 import '../../../presentation/blocs/chat/chat_state.dart';
 import '../../../presentation/widgets/chat/chat_list_item.dart';
 import '../../../core/constants/app_theme.dart';
 import '../../../widgets/shimmer_widgets.dart';
+import '../../../providers/chat_provider.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
@@ -45,6 +47,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: BlocBuilder<ChatBloc, ChatState>(
         builder: (context, state) {
           if (state is ChatRoomsLoaded) {
+            // Sync unread counts with ChatProvider when rooms are loaded
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              final chatProvider = Provider.of<ChatProvider>(
+                context,
+                listen: false,
+              );
+              chatProvider.syncUnreadCountsFromChatRooms(state.chatRooms);
+            });
+
             if (state.chatRooms.isEmpty) {
               return _buildEmptyState();
             }

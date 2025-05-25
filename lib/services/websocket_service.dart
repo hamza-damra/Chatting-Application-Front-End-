@@ -7,6 +7,7 @@ import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import '../config/api_config.dart';
 import '../utils/logger.dart';
 import '../core/services/token_service.dart';
+import '../models/unread_message_notification.dart';
 
 // A transform stream to read bytes from a file stream
 class ByteConversionStream extends StreamTransformerBase<List<int>, List<int>> {
@@ -45,6 +46,12 @@ class WebSocketService {
   // Custom subscription handlers
   final Map<String, List<Function(StompFrame)>> _customSubscriptionHandlers =
       {};
+
+  // Presence tracking
+  final Set<int> _activeRooms = <int>{};
+
+  // Notification callbacks
+  Function(UnreadMessageNotification)? _onUnreadNotificationReceived;
 
   WebSocketService({required TokenService tokenService})
     : _tokenService = tokenService;
@@ -136,6 +143,12 @@ class WebSocketService {
 
   // Disconnect from WebSocket
   Future<void> disconnect() async {
+    // Leave all active rooms before disconnecting
+    for (final roomId in _activeRooms.toList()) {
+      leaveRoom(roomId);
+    }
+    _activeRooms.clear();
+
     if (_stompClient != null && _isConnected) {
       _stompClient!.deactivate();
     }
@@ -155,6 +168,9 @@ class WebSocketService {
       await controller.close();
     }
     _userStatusControllers.clear();
+
+    // Clear notification callback
+    _onUnreadNotificationReceived = null;
 
     AppLogger.i('WebSocketService', 'Disconnected from WebSocket');
   }
@@ -820,6 +836,13 @@ class WebSocketService {
 
     // Subscribe to file upload channels
     _subscribeToFileChannels();
+
+    // Subscribe to unread updates if callback is registered
+    if (_onUnreadUpdate != null) {
+      Future.delayed(Duration(milliseconds: 200), () {
+        _subscribeToUnreadTopic();
+      });
+    }
 
     // Process any queued messages after a short delay to ensure subscriptions are established
     Future.delayed(Duration(milliseconds: 500), () {
@@ -2078,4 +2101,277 @@ class WebSocketService {
 
     return completer.future;
   }
+
+  // ============================================================================
+  // REAL-TIME UNREAD MESSAGE NOTIFICATIONS
+  // ============================================================================
+
+  // Callback for unread count updates
+  Function(Map<String, dynamic>)? _onUnreadUpdate;
+
+  // Subscribe to real-time unread count updates
+  void subscribeToUnreadUpdates({
+    required Function(Map<String, dynamic>) onUnreadUpdate,
+  }) {
+    _onUnreadUpdate = onUnreadUpdate;
+
+    if (_stompClient?.connected ?? false) {
+      _subscribeToUnreadTopic();
+    } else {
+      AppLogger.w(
+        'WebSocketService',
+        'WebSocket not connected, unread subscription will happen when connection is established',
+      );
+    }
+  }
+
+  // Subscribe to the unread updates topic
+  void _subscribeToUnreadTopic() {
+    try {
+      AppLogger.i('WebSocketService', 'Subscribing to unread updates topic');
+
+      _stompClient!.subscribe(
+        destination: '/user/queue/unread',
+        callback: (StompFrame frame) {
+          try {
+            final data = jsonDecode(frame.body ?? '{}');
+            AppLogger.i('WebSocketService', 'Received unread update: $data');
+
+            if (_onUnreadUpdate != null) {
+              _onUnreadUpdate!(data);
+            }
+          } catch (e) {
+            AppLogger.e('WebSocketService', 'Error parsing unread update: $e');
+          }
+        },
+        headers: {'Authorization': 'Bearer ${_tokenService.accessToken}'},
+      );
+
+      AppLogger.i(
+        'WebSocketService',
+        'Successfully subscribed to unread updates',
+      );
+    } catch (e) {
+      AppLogger.e(
+        'WebSocketService',
+        'Error subscribing to unread updates: $e',
+      );
+    }
+  }
+
+  // Request initial unread counts from server
+  void requestUnreadCounts() {
+    if (!(_stompClient?.connected ?? false)) {
+      AppLogger.w(
+        'WebSocketService',
+        'Cannot request unread counts: WebSocket not connected',
+      );
+      return;
+    }
+
+    try {
+      AppLogger.i('WebSocketService', 'Requesting initial unread counts');
+
+      _stompClient!.send(
+        destination: '/app/chat.getUnreadCounts',
+        body: '{}',
+        headers: {
+          'content-type': 'application/json',
+          'Authorization': 'Bearer ${_tokenService.accessToken}',
+        },
+      );
+
+      AppLogger.i('WebSocketService', 'Unread counts request sent');
+    } catch (e) {
+      AppLogger.e('WebSocketService', 'Error requesting unread counts: $e');
+    }
+  }
+
+  // Mark entire room as read via WebSocket
+  Future<bool> markRoomAsRead(int roomId) async {
+    if (!(_stompClient?.connected ?? false)) {
+      AppLogger.w(
+        'WebSocketService',
+        'Cannot mark room as read: WebSocket not connected',
+      );
+      return false;
+    }
+
+    try {
+      AppLogger.i(
+        'WebSocketService',
+        'Marking room $roomId as read via WebSocket',
+      );
+
+      _stompClient!.send(
+        destination: '/app/chat.markRoomAsRead/$roomId',
+        body: '{}',
+        headers: {
+          'content-type': 'application/json',
+          'Authorization': 'Bearer ${_tokenService.accessToken}',
+        },
+      );
+
+      AppLogger.i(
+        'WebSocketService',
+        'Mark room as read request sent for room $roomId',
+      );
+      return true;
+    } catch (e) {
+      AppLogger.e('WebSocketService', 'Error marking room as read: $e');
+      return false;
+    }
+  }
+
+  // ========== NEW PRESENCE TRACKING METHODS ==========
+
+  /// Mark user as active in a room (presence tracking)
+  void enterRoom(int roomId) {
+    if (!(_stompClient?.connected ?? false)) {
+      AppLogger.w(
+        'WebSocketService',
+        'Cannot enter room: WebSocket not connected',
+      );
+      return;
+    }
+
+    try {
+      _stompClient!.send(
+        destination: '/app/chat.enterRoom/$roomId',
+        body: '',
+        headers: {'Authorization': 'Bearer ${_tokenService.accessToken}'},
+      );
+
+      _activeRooms.add(roomId);
+      AppLogger.i('WebSocketService', 'Entered room: $roomId');
+    } catch (e) {
+      AppLogger.e('WebSocketService', 'Error entering room $roomId: $e');
+    }
+  }
+
+  /// Mark user as inactive in a room (presence tracking)
+  void leaveRoom(int roomId) {
+    if (!(_stompClient?.connected ?? false)) {
+      AppLogger.w(
+        'WebSocketService',
+        'Cannot leave room: WebSocket not connected',
+      );
+      return;
+    }
+
+    try {
+      _stompClient!.send(
+        destination: '/app/chat.leaveRoom/$roomId',
+        body: '',
+        headers: {'Authorization': 'Bearer ${_tokenService.accessToken}'},
+      );
+
+      _activeRooms.remove(roomId);
+      AppLogger.i('WebSocketService', 'Left room: $roomId');
+    } catch (e) {
+      AppLogger.e('WebSocketService', 'Error leaving room $roomId: $e');
+    }
+  }
+
+  /// Get room presence information (for debugging)
+  void getRoomPresence(int roomId) {
+    if (!(_stompClient?.connected ?? false)) {
+      AppLogger.w(
+        'WebSocketService',
+        'Cannot get room presence: WebSocket not connected',
+      );
+      return;
+    }
+
+    try {
+      _stompClient!.send(
+        destination: '/app/chat.getRoomPresence/$roomId',
+        body: '',
+        headers: {'Authorization': 'Bearer ${_tokenService.accessToken}'},
+      );
+
+      AppLogger.i('WebSocketService', 'Requested presence for room: $roomId');
+    } catch (e) {
+      AppLogger.e(
+        'WebSocketService',
+        'Error getting room presence $roomId: $e',
+      );
+    }
+  }
+
+  /// Subscribe to rich unread message notifications
+  void subscribeToUnreadNotifications({
+    required Function(UnreadMessageNotification) onNotificationReceived,
+  }) {
+    _onUnreadNotificationReceived = onNotificationReceived;
+
+    AppLogger.i(
+      'WebSocketService',
+      'Attempting to subscribe to unread notifications...',
+    );
+
+    if (!(_stompClient?.connected ?? false)) {
+      AppLogger.w(
+        'WebSocketService',
+        'Cannot subscribe to notifications: WebSocket not connected',
+      );
+      return;
+    }
+
+    try {
+      _stompClient!.subscribe(
+        destination: '/user/unread-messages',
+        callback: (StompFrame frame) {
+          AppLogger.i(
+            'WebSocketService',
+            'Received frame on /user/unread-messages',
+          );
+          if (frame.body != null) {
+            AppLogger.i('WebSocketService', 'Frame body: ${frame.body}');
+            try {
+              final notificationData = jsonDecode(frame.body!);
+              AppLogger.i(
+                'WebSocketService',
+                'Parsed notification data: $notificationData',
+              );
+              final notification = UnreadMessageNotification.fromJson(
+                notificationData,
+              );
+
+              AppLogger.i(
+                'WebSocketService',
+                'Successfully created notification: ${notification.senderUsername} in ${notification.chatRoomName}',
+              );
+
+              _onUnreadNotificationReceived?.call(notification);
+            } catch (e) {
+              AppLogger.e(
+                'WebSocketService',
+                'Error parsing unread message notification: $e',
+              );
+              AppLogger.e('WebSocketService', 'Raw frame body: ${frame.body}');
+            }
+          } else {
+            AppLogger.w('WebSocketService', 'Received frame with null body');
+          }
+        },
+      );
+
+      AppLogger.i(
+        'WebSocketService',
+        'Subscribed to unread message notifications',
+      );
+    } catch (e) {
+      AppLogger.e(
+        'WebSocketService',
+        'Error subscribing to unread notifications: $e',
+      );
+    }
+  }
+
+  /// Get list of currently active rooms
+  Set<int> get activeRooms => Set.unmodifiable(_activeRooms);
+
+  /// Check if user is currently active in a specific room
+  bool isActiveInRoom(int roomId) => _activeRooms.contains(roomId);
 }

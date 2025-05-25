@@ -15,6 +15,8 @@ import 'providers/api_auth_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/user_status_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/notification_provider.dart';
+import 'services/notification_service.dart';
 import 'utils/url_utils.dart';
 
 // Import new architecture components
@@ -48,6 +50,9 @@ void main() async {
     UrlUtils.setAuthToken(tokenService.accessToken!);
   }
 
+  // Initialize notification service
+  await NotificationService.initialize();
+
   runApp(MyApp(tokenService: tokenService));
 }
 
@@ -73,16 +78,29 @@ class MyApp extends StatelessWidget {
           ChangeNotifierProvider(
             create: (_) => ApiAuthProvider(authService: apiAuthService),
           ),
+          ChangeNotifierProvider(create: (_) => NotificationProvider()),
           ChangeNotifierProvider(
-            create:
-                (context) => ChatProvider(
-                  chatService: apiChatService,
-                  webSocketService: webSocketService,
-                  authProvider: Provider.of<ApiAuthProvider>(
-                    context,
-                    listen: false,
-                  ),
+            create: (context) {
+              final chatProvider = ChatProvider(
+                chatService: apiChatService,
+                webSocketService: webSocketService,
+                authProvider: Provider.of<ApiAuthProvider>(
+                  context,
+                  listen: false,
                 ),
+              );
+
+              // Connect ChatProvider with NotificationProvider
+              final notificationProvider = Provider.of<NotificationProvider>(
+                context,
+                listen: false,
+              );
+              chatProvider.setNotificationCallback(
+                notificationProvider.addNotification,
+              );
+
+              return chatProvider;
+            },
           ),
           ChangeNotifierProvider(
             create:

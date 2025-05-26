@@ -126,26 +126,22 @@ class _CreatePrivateChatScreenState extends State<CreatePrivateChatScreen> {
   }
 
   Future<void> _createPrivateChat(BuildContext context, UserModel user) async {
-    // Create a method-level function to safely use context after async operations
-    void safelyUseContext(Function(BuildContext ctx) action) {
-      if (mounted) {
-        action(context);
-      }
-    }
-
     setState(() {
       _isCreating = true;
     });
+
+    // Store navigator before async operations
+    final navigator = Navigator.of(context);
 
     try {
       // Get provider before async operation
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
-      // Store error message before async operation
-      final errorMessageProvider =
-          chatProvider.error ?? 'Failed to create chat';
+      AppLogger.i(
+        'CreatePrivateChatScreen',
+        'Creating private chat with user: ${user.fullName}',
+      );
 
-      // Create the private chat
       final roomId = await chatProvider.createRoom(
         userIds: [user.id.toString()],
         name: user.fullName, // Use the user's name as the room name
@@ -157,58 +153,63 @@ class _CreatePrivateChatScreenState extends State<CreatePrivateChatScreen> {
       if (!mounted) return;
 
       if (roomId != null) {
-        // Try to find the newly created room
-        try {
-          // Wait a moment to ensure the room list is updated
-          await Future.delayed(const Duration(milliseconds: 300));
+        AppLogger.i(
+          'CreatePrivateChatScreen',
+          'Room created successfully with ID: $roomId',
+        );
 
-          // Find the room in the updated list
-          final newRoom = chatProvider.rooms.firstWhere(
-            (room) => room.id == roomId,
-            orElse: () => throw Exception('Room not found in list'),
+        // Wait a moment for the room to be properly set up
+        await Future.delayed(const Duration(milliseconds: 300));
+
+        // Get the selected room (createRoom should have selected it)
+        final selectedRoom = chatProvider.selectedRoom;
+
+        if (selectedRoom != null && selectedRoom.id == roomId && mounted) {
+          AppLogger.i(
+            'CreatePrivateChatScreen',
+            'Navigating to selected room: ${selectedRoom.name}',
           );
 
-          // Convert types.Room to ChatRoom using the public method
-          final chatRoom = chatProvider.convertRoomToChatRoom(newRoom);
+          try {
+            // Convert types.Room to ChatRoom using the public method
+            final chatRoom = chatProvider.convertRoomToChatRoom(selectedRoom);
 
-          // Navigate to the chat screen with the newly created room
-          // Use Navigator.pushReplacement instead of pop + push
-          safelyUseContext((ctx) {
-            Navigator.pushReplacement(
-              ctx,
+            // Navigate to the chat screen with the newly created room
+            navigator.pop(); // Close create chat screen
+            navigator.push(
               MaterialPageRoute(
                 builder: (context) => ChatScreen(chatRoom: chatRoom),
               ),
             );
-          });
-        } catch (e) {
-          AppLogger.e(
-            'CreatePrivateChatScreen',
-            'Error finding or navigating to new room: $e',
-          );
-          // Room was created but not found in the list or navigation failed
-          // Just return to previous screen
-          safelyUseContext((ctx) => Navigator.of(ctx).pop(true));
+            return; // Exit early on success
+          } catch (e) {
+            AppLogger.e(
+              'CreatePrivateChatScreen',
+              'Error converting selected room: $e',
+            );
+          }
+        }
+
+        // If we reach here, something went wrong but the room was created
+        AppLogger.w(
+          'CreatePrivateChatScreen',
+          'Room created but navigation failed. Selected room: ${selectedRoom?.id}, Expected: $roomId',
+        );
+
+        if (mounted) {
+          navigator.pop(true); // Just go back with success
         }
       } else {
-        // Show error message
-        safelyUseContext(
-          (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(
-            SnackBar(
-              content: Text(errorMessageProvider),
-              backgroundColor: Colors.red,
-            ),
-          ),
-        );
+        AppLogger.e('CreatePrivateChatScreen', 'Failed to create room');
+        if (mounted) {
+          navigator.pop(); // Just go back
+        }
       }
     } catch (e) {
-      // Use the safe context method for error handling
-      final errorMessage = 'Error: $e';
-      safelyUseContext(
-        (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(
-          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
-        ),
-      );
+      AppLogger.e('CreatePrivateChatScreen', 'Error creating private chat: $e');
+      if (mounted) {
+        navigator.pop(); // Just go back
+      }
     } finally {
       if (mounted) {
         setState(() {

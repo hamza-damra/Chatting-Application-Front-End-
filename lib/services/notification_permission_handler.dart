@@ -19,19 +19,27 @@ class NotificationPermissionHandler {
 
       // Request basic notification permission
       final notificationGranted = await _requestNotificationPermission();
-      
+
       // Request battery optimization exemption (Android)
-      final batteryOptimizationGranted = await _requestBatteryOptimizationExemption(context);
-      
+      bool batteryOptimizationGranted = true;
+      if (context.mounted) {
+        batteryOptimizationGranted = await _requestBatteryOptimizationExemption(
+          context,
+        );
+      }
+
       // Request system alert window permission (Android)
       final systemAlertGranted = await _requestSystemAlertWindowPermission();
 
-      final allGranted = notificationGranted && batteryOptimizationGranted && systemAlertGranted;
+      final allGranted =
+          notificationGranted &&
+          batteryOptimizationGranted &&
+          systemAlertGranted;
 
       AppLogger.i(
         'NotificationPermissionHandler',
         'Permission results - Notification: $notificationGranted, '
-        'Battery: $batteryOptimizationGranted, SystemAlert: $systemAlertGranted',
+            'Battery: $batteryOptimizationGranted, SystemAlert: $systemAlertGranted',
       );
 
       return allGranted;
@@ -50,7 +58,7 @@ class NotificationPermissionHandler {
       // For Android 13+ (API 33+), request POST_NOTIFICATIONS permission
       if (Platform.isAndroid) {
         final status = await Permission.notification.request();
-        
+
         if (status.isGranted) {
           AppLogger.i(
             'NotificationPermissionHandler',
@@ -74,16 +82,19 @@ class NotificationPermissionHandler {
 
       // For iOS, request through flutter_local_notifications
       if (Platform.isIOS) {
-        final iosPlugin = _notifications
-            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>();
-        
+        final iosPlugin =
+            _notifications
+                .resolvePlatformSpecificImplementation<
+                  IOSFlutterLocalNotificationsPlugin
+                >();
+
         if (iosPlugin != null) {
           final granted = await iosPlugin.requestPermissions(
             alert: true,
             badge: true,
             sound: true,
           );
-          
+
           AppLogger.i(
             'NotificationPermissionHandler',
             'iOS notification permission granted: $granted',
@@ -103,12 +114,14 @@ class NotificationPermissionHandler {
   }
 
   /// Request battery optimization exemption (Android only)
-  static Future<bool> _requestBatteryOptimizationExemption(BuildContext context) async {
+  static Future<bool> _requestBatteryOptimizationExemption(
+    BuildContext context,
+  ) async {
     if (!Platform.isAndroid) return true;
 
     try {
       final status = await Permission.ignoreBatteryOptimizations.status;
-      
+
       if (status.isGranted) {
         AppLogger.i(
           'NotificationPermissionHandler',
@@ -118,11 +131,15 @@ class NotificationPermissionHandler {
       }
 
       // Show explanation dialog
-      final shouldRequest = await _showBatteryOptimizationDialog(context);
+      bool shouldRequest = false;
+      if (context.mounted) {
+        shouldRequest = await _showBatteryOptimizationDialog(context);
+      }
       if (!shouldRequest) return false;
 
-      final requestStatus = await Permission.ignoreBatteryOptimizations.request();
-      
+      final requestStatus =
+          await Permission.ignoreBatteryOptimizations.request();
+
       if (requestStatus.isGranted) {
         AppLogger.i(
           'NotificationPermissionHandler',
@@ -151,7 +168,7 @@ class NotificationPermissionHandler {
 
     try {
       final status = await Permission.systemAlertWindow.status;
-      
+
       if (status.isGranted) {
         AppLogger.i(
           'NotificationPermissionHandler',
@@ -161,7 +178,7 @@ class NotificationPermissionHandler {
       }
 
       final requestStatus = await Permission.systemAlertWindow.request();
-      
+
       if (requestStatus.isGranted) {
         AppLogger.i(
           'NotificationPermissionHandler',
@@ -185,30 +202,33 @@ class NotificationPermissionHandler {
   }
 
   /// Show battery optimization explanation dialog
-  static Future<bool> _showBatteryOptimizationDialog(BuildContext context) async {
+  static Future<bool> _showBatteryOptimizationDialog(
+    BuildContext context,
+  ) async {
     return await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Battery Optimization'),
-          content: const Text(
-            'To receive notifications when the app is in the background, '
-            'please disable battery optimization for this app. This ensures '
-            'the app can continue running in the background to receive messages.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Allow'),
-            ),
-          ],
-        );
-      },
-    ) ?? false;
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('Battery Optimization'),
+              content: const Text(
+                'To receive notifications when the app is in the background, '
+                'please disable battery optimization for this app. This ensures '
+                'the app can continue running in the background to receive messages.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(true),
+                  child: const Text('Allow'),
+                ),
+              ],
+            );
+          },
+        ) ??
+        false;
   }
 
   /// Check if all required permissions are granted
@@ -221,7 +241,8 @@ class NotificationPermissionHandler {
       // Check battery optimization (Android only)
       bool batteryOptimizationGranted = true;
       if (Platform.isAndroid) {
-        final batteryStatus = await Permission.ignoreBatteryOptimizations.status;
+        final batteryStatus =
+            await Permission.ignoreBatteryOptimizations.status;
         batteryOptimizationGranted = batteryStatus.isGranted;
       }
 
@@ -232,12 +253,15 @@ class NotificationPermissionHandler {
         systemAlertGranted = systemAlertStatus.isGranted;
       }
 
-      final allGranted = notificationGranted && batteryOptimizationGranted && systemAlertGranted;
+      final allGranted =
+          notificationGranted &&
+          batteryOptimizationGranted &&
+          systemAlertGranted;
 
       AppLogger.i(
         'NotificationPermissionHandler',
         'Permission check - Notification: $notificationGranted, '
-        'Battery: $batteryOptimizationGranted, SystemAlert: $systemAlertGranted',
+            'Battery: $batteryOptimizationGranted, SystemAlert: $systemAlertGranted',
       );
 
       return allGranted;

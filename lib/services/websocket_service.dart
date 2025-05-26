@@ -8,6 +8,7 @@ import '../config/api_config.dart';
 import '../utils/logger.dart';
 import '../core/services/token_service.dart';
 import '../models/unread_message_notification.dart';
+import 'connectivity_service.dart';
 
 // A transform stream to read bytes from a file stream
 class ByteConversionStream extends StreamTransformerBase<List<int>, List<int>> {
@@ -137,6 +138,7 @@ class WebSocketService {
       );
       _isConnected = false;
       _connectionStateController.add(false);
+      ConnectivityService.handleConnectivityError(e.toString());
       _attemptReconnect();
     }
   }
@@ -180,6 +182,9 @@ class WebSocketService {
     AppLogger.e('WebSocketService', 'WebSocket error: $error');
     _isConnected = false;
     _connectionStateController.add(false);
+
+    // Handle connectivity error
+    ConnectivityService.handleConnectivityError(error.toString());
 
     // Attempt to reconnect
     _attemptReconnect();

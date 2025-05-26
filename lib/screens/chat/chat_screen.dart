@@ -5,6 +5,7 @@ import 'package:chatting_application/providers/api_auth_provider.dart';
 import 'package:chatting_application/providers/chat_provider.dart';
 import 'package:chatting_application/services/improved_file_upload_service.dart';
 import 'package:chatting_application/services/websocket_service.dart' as ws;
+import 'package:chatting_application/screens/chat/group_settings_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -270,13 +271,129 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _handleGroupLeft() {
+    // Navigate back to group list
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  void _showGroupMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.settings),
+                  title: const Text('Group Settings'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) =>
+                                GroupSettingsScreen(chatRoom: widget.chatRoom),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.exit_to_app, color: Colors.red),
+                  title: const Text(
+                    'Leave Group',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showLeaveGroupDialog();
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showLeaveGroupDialog() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text('Leave Group'),
+            content: Text(
+              'Are you sure you want to leave "${widget.chatRoom.name}"?\n\n'
+              'You will no longer receive messages from this group.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _leaveGroup();
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: const Text('Leave Group'),
+              ),
+            ],
+          ),
+    );
+  }
+
+  Future<void> _leaveGroup() async {
+    try {
+      final success = await _chatProvider.leaveGroup(widget.chatRoom.id);
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Successfully left the group'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        _handleGroupLeft();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_chatProvider.error ?? 'Failed to leave group'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error leaving group: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Check if this is a group chat (has multiple participants)
+    final isGroupChat = widget.chatRoom.participantIds.length > 2;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.chatRoom.name ?? 'Chat'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadMessages),
+          if (isGroupChat)
+            IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: _showGroupMenu,
+            ),
         ],
       ),
       body: _buildMessageList(),

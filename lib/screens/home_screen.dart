@@ -162,11 +162,8 @@ class _HomeScreenState extends State<HomeScreen> {
       MaterialPageRoute(builder: (_) => const CreatePrivateChatScreen()),
     );
     if (!mounted) return;
+    // Refresh rooms in case user returns without creating a chat
     await chatProvider.refreshRooms();
-    if (!mounted) return;
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Chat rooms refreshed')));
   }
 
   Future<void> _goToCreateGroupChat() async {

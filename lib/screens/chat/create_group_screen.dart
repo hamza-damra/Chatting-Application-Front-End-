@@ -4,6 +4,7 @@ import '../../models/user_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/api_auth_provider.dart';
 import '../../widgets/user_avatar.dart';
+import 'chat_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
   const CreateGroupScreen({super.key});
@@ -20,10 +21,28 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
   bool _isCreating = false;
 
   @override
+  void initState() {
+    super.initState();
+    // Listen to group name changes to update the create button
+    _groupNameController.addListener(() {
+      setState(() {
+        // This will trigger a rebuild and update the button state
+      });
+    });
+  }
+
+  @override
   void dispose() {
     _groupNameController.dispose();
     _groupImageController.dispose();
     super.dispose();
+  }
+
+  /// Check if the group can be created
+  bool _canCreateGroup() {
+    return _selectedUsers.isNotEmpty &&
+        _groupNameController.text.trim().isNotEmpty &&
+        !_isCreating;
   }
 
   @override
@@ -42,19 +61,45 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       appBar: AppBar(
         title: const Text('Create Group'),
         actions: [
-          TextButton(
-            onPressed:
-                _selectedUsers.isEmpty || _isCreating
-                    ? null
-                    : () => _createGroup(context),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child:
                 _isCreating
                     ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
                     )
-                    : const Text('Create'),
+                    : TextButton(
+                      onPressed:
+                          _canCreateGroup()
+                              ? () => _createGroup(context)
+                              : null,
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor:
+                            _canCreateGroup()
+                                ? Colors.white.withValues(alpha: 0.1)
+                                : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: const Text(
+                        'Create',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
           ),
         ],
       ),
@@ -215,7 +260,41 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
         // Use the safe context method
         if (roomId != null) {
-          safelyUseContext((ctx) => Navigator.of(ctx).pop(true));
+          // Try to find the newly created room and navigate to it
+          try {
+            // Wait a moment to ensure the room list is updated
+            await Future.delayed(const Duration(milliseconds: 500));
+
+            // Find the room in the updated list
+            final newRoom = chatProvider.rooms.firstWhere(
+              (room) => room.id == roomId,
+              orElse: () => throw Exception('Room not found in list'),
+            );
+
+            // Convert types.Room to ChatRoom using the public method
+            final chatRoom = chatProvider.convertRoomToChatRoom(newRoom);
+
+            // Navigate to the chat screen with the newly created room
+            safelyUseContext((ctx) {
+              Navigator.of(ctx).pop(); // Close create group screen
+              Navigator.of(ctx).push(
+                MaterialPageRoute(
+                  builder: (context) => ChatScreen(chatRoom: chatRoom),
+                ),
+              );
+            });
+          } catch (e) {
+            // If navigation fails, just return with success
+            safelyUseContext((ctx) {
+              Navigator.of(ctx).pop(true);
+              ScaffoldMessenger.of(ctx).showSnackBar(
+                const SnackBar(
+                  content: Text('Group created successfully!'),
+                  backgroundColor: Colors.green,
+                ),
+              );
+            });
+          }
         } else {
           safelyUseContext(
             (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(

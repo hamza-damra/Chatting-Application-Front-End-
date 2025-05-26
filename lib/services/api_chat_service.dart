@@ -5,6 +5,7 @@ import '../config/api_config.dart';
 import '../models/user_model.dart';
 import '../utils/logger.dart';
 import '../core/services/token_service.dart';
+import 'connectivity_service.dart';
 
 class ApiChatService {
   final TokenService _tokenService;
@@ -51,6 +52,7 @@ class ApiChatService {
       }
     } catch (e) {
       AppLogger.e('ApiChatService', 'Error getting chat rooms: $e');
+      ConnectivityService.handleConnectivityError(e.toString());
       rethrow;
     }
   }
@@ -72,6 +74,7 @@ class ApiChatService {
         throw _handleError(response);
       }
     } catch (e) {
+      ConnectivityService.handleConnectivityError(e.toString());
       rethrow;
     }
   }
@@ -133,6 +136,7 @@ class ApiChatService {
       }
     } catch (e) {
       AppLogger.e('ApiChatService', 'Error creating chat room: $e');
+      ConnectivityService.handleConnectivityError(e.toString());
       rethrow;
     }
   }
@@ -202,10 +206,17 @@ class ApiChatService {
         headers: ApiConfig.getAuthHeaders(_tokenService.accessToken!),
       );
 
-      if (response.statusCode != 200) {
+      AppLogger.i(
+        'ApiChatService',
+        'Remove participant response: ${response.statusCode} - ${response.body}',
+      );
+
+      // Accept both 200 and 204 as success for DELETE operations
+      if (response.statusCode != 200 && response.statusCode != 204) {
         throw _handleError(response);
       }
     } catch (e) {
+      AppLogger.e('ApiChatService', 'Error removing participant: $e');
       rethrow;
     }
   }
@@ -484,6 +495,31 @@ class ApiChatService {
       }
     } catch (e) {
       AppLogger.e('ApiChatService', 'Error adding participant: $e');
+      rethrow;
+    }
+  }
+
+  // Delete user from system
+  Future<void> deleteUser({required int userId}) async {
+    try {
+      await _ensureValidToken();
+
+      final response = await _httpClient.delete(
+        Uri.parse('${ApiConfig.baseUrl}${ApiConfig.usersEndpoint}/$userId'),
+        headers: ApiConfig.getAuthHeaders(_tokenService.accessToken!),
+      );
+
+      AppLogger.i(
+        'ApiChatService',
+        'Delete user response: ${response.statusCode} - ${response.body}',
+      );
+
+      // Accept both 200 and 204 as success for DELETE operations
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw _handleError(response);
+      }
+    } catch (e) {
+      AppLogger.e('ApiChatService', 'Error deleting user: $e');
       rethrow;
     }
   }

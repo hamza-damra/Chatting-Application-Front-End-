@@ -3,11 +3,8 @@ import 'package:provider/provider.dart';
 import '../providers/api_auth_provider.dart';
 import '../widgets/custom_button.dart';
 import '../services/background_notification_manager.dart';
-import 'shimmer_test_screen.dart';
 import 'media_gallery_screen.dart';
 import 'storage_stats_screen.dart';
-import 'debug_screen.dart';
-import 'notification_test_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -90,7 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (value) {
             setState(() {
               _darkMode = value;
-              // TODO: Implement theme switching - will be addressed in future updates
+              // Theme switching functionality to be implemented
             });
           },
         ),
@@ -105,7 +102,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (value) {
             setState(() {
               _notifications = value;
-              // TODO: Implement notification settings - will be addressed in future updates
+              // Notification settings functionality to be implemented
             });
           },
         ),
@@ -126,7 +123,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (value) {
             setState(() {
               _readReceipts = value;
-              // TODO: Implement read receipts settings - will be addressed in future updates
+              // Read receipts functionality to be implemented
             });
           },
         ),
@@ -138,7 +135,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           onChanged: (value) {
             setState(() {
               _typingIndicators = value;
-              // TODO: Implement typing indicators settings - will be addressed in future updates
+              // Typing indicators functionality to be implemented
             });
           },
         ),
@@ -198,43 +195,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: 'Get help with using the app',
           onTap: () {
             // Navigate to help screen
-          },
-        ),
-        _buildSettingCard(
-          icon: Icons.bug_report,
-          title: 'Debug API',
-          subtitle: 'Test API endpoints',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const DebugScreen()),
-            );
-          },
-        ),
-        _buildSettingCard(
-          icon: Icons.animation,
-          title: 'Shimmer Effects Test',
-          subtitle: 'View all shimmer loading animations',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const ShimmerTestScreen(),
-              ),
-            );
-          },
-        ),
-        _buildSettingCard(
-          icon: Icons.notifications_active,
-          title: 'Notification Test',
-          subtitle: 'Test notification system and permissions',
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const NotificationTestScreen(),
-              ),
-            );
           },
         ),
 

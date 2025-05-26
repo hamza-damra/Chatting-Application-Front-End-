@@ -19,7 +19,10 @@ import 'providers/notification_provider.dart';
 import 'services/notification_service.dart';
 import 'services/navigation_service.dart';
 import 'services/background_notification_manager.dart';
+
+import 'services/connectivity_service.dart';
 import 'utils/url_utils.dart';
+import 'utils/logger.dart';
 
 // Import new architecture components
 import 'core/di/service_locator.dart';
@@ -40,31 +43,102 @@ import 'widgets/shimmer_widgets.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize service locator
-  setupServiceLocator();
+  try {
+    // Initialize service locator
+    setupServiceLocator();
 
-  // Get the token service from service locator and initialize it
-  final tokenService = serviceLocator<TokenService>();
-  await tokenService.init();
+    // Get the token service from service locator and initialize it
+    final tokenService = serviceLocator<TokenService>();
+    await tokenService.init();
 
-  // Initialize URL utils with the token
-  if (tokenService.accessToken != null) {
-    UrlUtils.setAuthToken(tokenService.accessToken!);
+    // Initialize URL utils with the token
+    if (tokenService.accessToken != null) {
+      UrlUtils.setAuthToken(tokenService.accessToken!);
+    }
+
+    // Initialize notification service
+    await NotificationService.initialize();
+
+    // Initialize background notification manager
+    await BackgroundNotificationManager.initialize();
+
+    // Initialize connectivity monitoring
+    await ConnectivityService.instance.initialize();
+
+    AppLogger.i('Main', 'Application initialized successfully');
+
+    runApp(MyApp(tokenService: tokenService));
+  } catch (e) {
+    AppLogger.e('Main', 'Failed to initialize application: $e');
+
+    // Show a basic error app if initialization fails
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Failed to start the application',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Please restart the app or contact support',
+                  style: TextStyle(color: Colors.grey[600]),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
-
-  // Initialize notification service
-  await NotificationService.initialize();
-
-  // Initialize background notification manager
-  await BackgroundNotificationManager.initialize();
-
-  runApp(MyApp(tokenService: tokenService));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   final TokenService tokenService;
 
   const MyApp({super.key, required this.tokenService});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    ConnectivityService.instance.dispose();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground, check connectivity
+        ConnectivityService.instance.checkConnectivity();
+        break;
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+        // App going to background or being terminated
+        break;
+      default:
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,7 +152,7 @@ class MyApp extends StatelessWidget {
       child: MultiProvider(
         providers: [
           // Provide TokenService for authenticated image loading
-          Provider<TokenService>.value(value: tokenService),
+          Provider<TokenService>.value(value: widget.tokenService),
           // Keep old providers for backward compatibility
           ChangeNotifierProvider(
             create: (_) => ApiAuthProvider(authService: apiAuthService),
@@ -120,14 +194,14 @@ class MyApp extends StatelessWidget {
                 (_) => ImprovedFileUploadService(
                   baseUrl: ApiConfig.baseUrl,
                   headers: ApiConfig.getAuthHeaders(
-                    tokenService.accessToken ?? '',
+                    widget.tokenService.accessToken ?? '',
                   ),
                   webSocketService: webSocketService,
                 ),
           ),
           // Provide new REST API file service
           Provider<ApiFileService>(
-            create: (_) => ApiFileService(tokenService: tokenService),
+            create: (_) => ApiFileService(tokenService: widget.tokenService),
           ),
           // Provide improved chat service
           Provider<ImprovedChatService>(

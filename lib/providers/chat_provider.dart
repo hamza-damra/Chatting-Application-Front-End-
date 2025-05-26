@@ -2181,6 +2181,145 @@ class ChatProvider with ChangeNotifier {
     }
   }
 
+  // Leave a group (remove current user from group)
+  Future<bool> leaveGroup(int roomId) async {
+    try {
+      final currentUser = _authProvider.user;
+      if (currentUser == null) {
+        _error = 'User not authenticated';
+        notifyListeners();
+        return false;
+      }
+
+      return await removeParticipant(roomId: roomId, userId: currentUser.id);
+    } catch (e) {
+      _error = 'Failed to leave group: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Remove participant from chat room
+  Future<bool> removeParticipant({
+    required int roomId,
+    required int userId,
+  }) async {
+    try {
+      await _chatService.removeParticipant(roomId: roomId, userId: userId);
+
+      // If the current user is being removed from the room, clean up local state
+      if (userId == currentUserId) {
+        final roomIdStr = roomId.toString();
+
+        // Remove from active subscriptions
+        _activeSubscriptions.remove(roomIdStr);
+
+        // Clear selected room if we're leaving the currently selected room
+        if (_selectedRoom?.id == roomIdStr) {
+          _selectedRoom = null;
+        }
+
+        // Clear unread count
+        _unreadMessageCounts.remove(roomIdStr);
+
+        // Clear join time
+        _userJoinTimes.remove(roomIdStr);
+
+        // Clear messages for this room
+        _messages.remove(roomIdStr);
+
+        // Remove room from rooms list
+        _rooms.removeWhere((room) => room.id == roomIdStr);
+
+        // Notify server that we're leaving this room
+        _webSocketService.leaveChatRoom(roomId).then((success) {
+          if (!success) {
+            AppLogger.w(
+              'ChatProvider',
+              'Failed to notify server about leaving room $roomId',
+            );
+          }
+        });
+
+        AppLogger.i(
+          'ChatProvider',
+          'Cleaned up local state after leaving room $roomId',
+        );
+      }
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // Delete user from system
+  Future<bool> deleteUser(int userId) async {
+    try {
+      await _chatService.deleteUser(userId: userId);
+
+      // Remove all private chats with this user
+      _rooms.removeWhere((room) {
+        if (room.type == types.RoomType.direct) {
+          // Check if this room contains the deleted user
+          return room.users.any((user) => user.id == userId.toString());
+        }
+        return false;
+      });
+
+      // Clear any selected room if it was with the deleted user
+      if (_selectedRoom?.type == types.RoomType.direct) {
+        final hasDeletedUser = _selectedRoom!.users.any(
+          (user) => user.id == userId.toString(),
+        );
+        if (hasDeletedUser) {
+          _selectedRoom = null;
+        }
+      }
+
+      // Clear messages for rooms with deleted user
+      final roomsToRemove = <String>[];
+      for (final entry in _messages.entries) {
+        final roomId = entry.key;
+        final room = _rooms.firstWhere(
+          (r) => r.id == roomId,
+          orElse:
+              () => types.Room(id: '', type: types.RoomType.direct, users: []),
+        );
+        if (room.type == types.RoomType.direct) {
+          final hasDeletedUser = room.users.any(
+            (user) => user.id == userId.toString(),
+          );
+          if (hasDeletedUser) {
+            roomsToRemove.add(roomId);
+          }
+        }
+      }
+
+      for (final roomId in roomsToRemove) {
+        _messages.remove(roomId);
+        _unreadMessageCounts.remove(roomId);
+        _userJoinTimes.remove(roomId);
+        _activeSubscriptions.remove(roomId);
+      }
+
+      AppLogger.i(
+        'ChatProvider',
+        'Cleaned up local state after deleting user $userId',
+      );
+
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = 'Failed to delete user: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   void _sendRealTimeMessage(
     String roomId,
     int senderId,

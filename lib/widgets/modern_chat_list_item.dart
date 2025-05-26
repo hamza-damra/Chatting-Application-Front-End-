@@ -1,18 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../domain/models/chat_room_model.dart';
-import '../../../providers/chat_provider.dart';
-import '../../../widgets/blocked_user_indicator.dart';
+import '../models/chat_room.dart';
+import '../providers/chat_provider.dart';
+import '../widgets/blocked_user_indicator.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
-class ChatListItem extends StatelessWidget {
-  final ChatRoomModel chatRoom;
-  final String currentUserId;
+class ModernChatListItem extends StatelessWidget {
+  final ChatRoom chatRoom;
+  final int currentUserId;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
-  const ChatListItem({
+  const ModernChatListItem({
     super.key,
     required this.chatRoom,
     required this.currentUserId,
@@ -23,16 +23,21 @@ class ChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayName = chatRoom.getDisplayName(currentUserId);
-    final avatarUrl = chatRoom.getAvatarUrl(currentUserId);
-    final isGroup = chatRoom.type == ChatRoomType.group;
-    final isOnline = !isGroup && chatRoom.isUserOnline(currentUserId);
-    final otherUserId = chatRoom.getOtherUserId(currentUserId);
+    final isGroup = !chatRoom.isPrivate;
+
+    // Get the other user ID for blocking status check (for private chats)
+    final otherUserId =
+        chatRoom.isPrivate
+            ? chatRoom.participantIds.firstWhere(
+              (id) => id != currentUserId,
+              orElse: () => -1,
+            )
+            : null;
 
     return Consumer<ChatProvider>(
       builder: (context, chatProvider, child) {
-        // Get real-time unread count from ChatProvider
-        final realTimeUnreadCount = chatProvider.getUnreadCount(chatRoom.id);
+        final roomIdString = chatRoom.id.toString();
+        final unreadCount = chatProvider.getUnreadCount(roomIdString);
 
         final chatListWidget = Container(
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -71,12 +76,10 @@ class ChatListItem extends StatelessWidget {
                 padding: const EdgeInsets.all(20),
                 child: Row(
                   children: [
-                    // Professional Avatar with Status Indicator
+                    // Professional Avatar
                     _buildAvatar(
-                      displayName: displayName,
-                      avatarUrl: avatarUrl,
+                      chatRoom: chatRoom,
                       isGroup: isGroup,
-                      isOnline: isOnline,
                       theme: theme,
                     ),
                     const SizedBox(width: 18),
@@ -92,7 +95,8 @@ class ChatListItem extends StatelessWidget {
                               // Chat name
                               Expanded(
                                 child: Text(
-                                  displayName,
+                                  chatRoom.name ??
+                                      (isGroup ? 'Group Chat' : 'Private Chat'),
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 17,
@@ -104,7 +108,7 @@ class ChatListItem extends StatelessWidget {
                               ),
 
                               // Timestamp
-                              if (chatRoom.lastMessageTime != null)
+                              if (chatRoom.lastActivity != null)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,
@@ -118,7 +122,7 @@ class ChatListItem extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Text(
-                                    _formatTimestamp(chatRoom.lastMessageTime!),
+                                    _formatTimestamp(chatRoom.lastActivity!),
                                     style: theme.textTheme.bodySmall?.copyWith(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
@@ -130,23 +134,23 @@ class ChatListItem extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
 
-                          // Last message and unread count
+                          // Subtitle and unread count
                           Row(
                             children: [
-                              // Last message
+                              // Subtitle (last message or member count)
                               Expanded(
                                 child: Text(
-                                  chatRoom.lastMessage ?? 'No messages yet',
+                                  _getSubtitle(chatRoom, isGroup),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontSize: 15,
                                     color:
-                                        realTimeUnreadCount > 0
+                                        unreadCount > 0
                                             ? theme.colorScheme.onSurface
                                             : theme
                                                 .colorScheme
                                                 .onSurfaceVariant,
                                     fontWeight:
-                                        realTimeUnreadCount > 0
+                                        unreadCount > 0
                                             ? FontWeight.w500
                                             : FontWeight.w400,
                                     letterSpacing: -0.1,
@@ -158,8 +162,8 @@ class ChatListItem extends StatelessWidget {
 
                               const SizedBox(width: 12),
 
-                              // Unread count (using real-time data from ChatProvider)
-                              if (realTimeUnreadCount > 0)
+                              // Unread count badge
+                              if (unreadCount > 0)
                                 Container(
                                   constraints: const BoxConstraints(
                                     minWidth: 24,
@@ -191,9 +195,9 @@ class ChatListItem extends StatelessWidget {
                                     ],
                                   ),
                                   child: Text(
-                                    realTimeUnreadCount > 99
+                                    unreadCount > 99
                                         ? '99+'
-                                        : realTimeUnreadCount.toString(),
+                                        : unreadCount.toString(),
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: Colors.white,
                                       fontSize: 11,
@@ -215,7 +219,7 @@ class ChatListItem extends StatelessWidget {
         );
 
         // Wrap with blocked user indicator for private chats
-        if (!isGroup && otherUserId != null) {
+        if (!isGroup && otherUserId != null && otherUserId != -1) {
           return BlockedUserIndicator(
             otherUserId: otherUserId,
             child: chatListWidget,
@@ -228,139 +232,68 @@ class ChatListItem extends StatelessWidget {
   }
 
   Widget _buildAvatar({
-    required String displayName,
-    required String avatarUrl,
+    required ChatRoom chatRoom,
     required bool isGroup,
-    required bool isOnline,
     required ThemeData theme,
   }) {
-    return Stack(
-      children: [
-        Container(
-          width: 64,
-          height: 64,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient:
-                isGroup
-                    ? LinearGradient(
-                      colors: [
-                        theme.colorScheme.primary,
-                        theme.colorScheme.secondary,
-                        theme.colorScheme.tertiary,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      stops: const [0.0, 0.6, 1.0],
-                    )
-                    : LinearGradient(
-                      colors: [
-                        theme.colorScheme.primaryContainer,
-                        theme.colorScheme.primaryContainer.withValues(
-                          alpha: 0.8,
-                        ),
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.2),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
+    final displayName = chatRoom.name ?? (isGroup ? 'G' : 'U');
+
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient:
+            isGroup
+                ? LinearGradient(
+                  colors: [
+                    theme.colorScheme.primary,
+                    theme.colorScheme.secondary,
+                    theme.colorScheme.tertiary,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: const [0.0, 0.6, 1.0],
+                )
+                : LinearGradient(
+                  colors: [
+                    theme.colorScheme.primaryContainer,
+                    theme.colorScheme.primaryContainer.withValues(alpha: 0.8),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.primary.withValues(alpha: 0.2),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
           ),
-          child: ClipOval(
-            child:
-                avatarUrl.isNotEmpty
-                    ? CachedNetworkImage(
-                      imageUrl: avatarUrl,
-                      fit: BoxFit.cover,
-                      placeholder:
-                          (context, url) => Container(
-                            color: theme.colorScheme.primaryContainer,
-                            child: Icon(
-                              isGroup ? Icons.group : Icons.person,
-                              color: theme.colorScheme.onPrimaryContainer,
-                              size: 28,
-                            ),
-                          ),
-                      errorWidget:
-                          (context, url, error) => Container(
-                            color: theme.colorScheme.primaryContainer,
-                            child: Icon(
-                              isGroup ? Icons.group : Icons.person,
-                              color: theme.colorScheme.onPrimaryContainer,
-                              size: 28,
-                            ),
-                          ),
-                    )
-                    : Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        gradient:
-                            isGroup
-                                ? LinearGradient(
-                                  colors: [
-                                    theme.colorScheme.primary,
-                                    theme.colorScheme.secondary,
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                )
-                                : null,
-                        color:
-                            !isGroup
-                                ? theme.colorScheme.primaryContainer
-                                : null,
-                      ),
-                      child: Center(
-                        child: Text(
-                          displayName.isNotEmpty
-                              ? displayName[0].toUpperCase()
-                              : '?',
-                          style: TextStyle(
-                            color:
-                                isGroup
-                                    ? Colors.white
-                                    : theme.colorScheme.onPrimaryContainer,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 22,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                      ),
-                    ),
-          ),
-        ),
-        // Online status indicator for private chats
-        if (!isGroup)
-          Positioned(
-            right: 4,
-            bottom: 4,
-            child: Container(
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: isOnline ? const Color(0xFF4CAF50) : Colors.grey[400],
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.colorScheme.surface, width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isOnline
-                            ? const Color(0xFF4CAF50)
-                            : Colors.grey[400]!)
-                        .withValues(alpha: 0.4),
-                    blurRadius: 4,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
+        ],
+      ),
+      child: ClipOval(
+        child: Center(
+          child: Text(
+            displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
+            style: TextStyle(
+              color:
+                  isGroup ? Colors.white : theme.colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w600,
+              fontSize: 22,
+              letterSpacing: 0.5,
             ),
           ),
-      ],
+        ),
+      ),
     );
+  }
+
+  String _getSubtitle(ChatRoom chatRoom, bool isGroup) {
+    if (isGroup) {
+      return '${chatRoom.participantIds.length} members${chatRoom.description != null ? ' • ${chatRoom.description}' : ''}';
+    } else {
+      return chatRoom.description ?? 'Private conversation';
+    }
   }
 
   String _formatTimestamp(DateTime timestamp) {

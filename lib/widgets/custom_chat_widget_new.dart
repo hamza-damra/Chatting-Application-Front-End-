@@ -12,6 +12,7 @@ import '../utils/logger.dart';
 import '../utils/url_utils.dart';
 import '../utils/file_type_helper.dart';
 import '../screens/file_viewers/text_file_viewer_screen.dart';
+import '../widgets/blocking_aware_chat_input.dart';
 import 'chat_image_thumbnail.dart';
 import 'video_player_widget.dart';
 
@@ -25,6 +26,8 @@ class CustomChatWidgetNew extends StatefulWidget {
   final bool showUserAvatars;
   final ImprovedFileUploadService webSocketService;
   final int roomId;
+  final int? otherUserId;
+  final String? otherUserName;
 
   const CustomChatWidgetNew({
     super.key,
@@ -35,6 +38,8 @@ class CustomChatWidgetNew extends StatefulWidget {
     required this.webSocketService,
     required this.roomId,
     this.showUserAvatars = true,
+    this.otherUserId,
+    this.otherUserName,
   });
 
   @override
@@ -356,13 +361,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
         ),
         if (_isUploading) _buildProgressIndicator(),
         if (_isAttachmentMenuOpen) _buildProfessionalAttachmentMenu(),
-        ProfessionalChatInput(
-          controller: _messageController,
-          onSendMessage: _sendMessage,
-          onAttachmentPressed: _toggleAttachmentMenu,
-          isAttachmentUploading: _isUploading,
-          hintText: 'Type a message...',
-        ),
+        _buildChatInput(),
       ],
     );
   }
@@ -427,6 +426,33 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       isEnabled: !_isUploading,
       isUploading: _isUploading,
     );
+  }
+
+  Widget _buildChatInput() {
+    // Check if this is a private chat (has other user info)
+    final isPrivateChat =
+        widget.otherUserId != null && widget.otherUserName != null;
+
+    if (isPrivateChat) {
+      // Use blocking-aware input for private chats
+      return BlockingAwareChatInput(
+        controller: _messageController,
+        onSendMessage: _sendMessage,
+        onAttachmentPressed: _toggleAttachmentMenu,
+        otherUserId: widget.otherUserId!,
+        otherUserName: widget.otherUserName!,
+        hintText: 'Type a message...',
+      );
+    } else {
+      // Use regular input for group chats
+      return ProfessionalChatInput(
+        controller: _messageController,
+        onSendMessage: _sendMessage,
+        onAttachmentPressed: _toggleAttachmentMenu,
+        isAttachmentUploading: _isUploading,
+        hintText: 'Type a message...',
+      );
+    }
   }
 
   Widget _buildMessageItem(Message message, bool isCurrentUser) {

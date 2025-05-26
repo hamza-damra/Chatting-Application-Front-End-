@@ -1,10 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'user_model.dart';
 
-enum ChatRoomType {
-  private,
-  group
-}
+enum ChatRoomType { private, group }
 
 class ChatRoomModel extends Equatable {
   final String id;
@@ -80,24 +77,28 @@ class ChatRoomModel extends Equatable {
       participants: List<UserModel>.from(
         (map['participants'] as List).map((p) => UserModel.fromMap(p)),
       ),
-      creator: map['creator'] != null ? UserModel.fromMap(map['creator']) : null,
+      creator:
+          map['creator'] != null ? UserModel.fromMap(map['creator']) : null,
       lastMessage: map['lastMessage'],
-      lastMessageTime: map['lastMessageTime'] != null
-          ? DateTime.parse(map['lastMessageTime'])
-          : null,
+      lastMessageTime:
+          map['lastMessageTime'] != null
+              ? DateTime.parse(map['lastMessageTime'])
+              : null,
       unreadCount: map['unreadCount'] ?? 0,
       createdAt: DateTime.parse(map['createdAt']),
-      updatedAt: map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
+      updatedAt:
+          map['updatedAt'] != null ? DateTime.parse(map['updatedAt']) : null,
     );
   }
 
   // Alias methods for backward compatibility
   Map<String, dynamic> toJson() => toMap();
-  factory ChatRoomModel.fromJson(Map<String, dynamic> json) => ChatRoomModel.fromMap(json);
+  factory ChatRoomModel.fromJson(Map<String, dynamic> json) =>
+      ChatRoomModel.fromMap(json);
 
   static ChatRoomType _parseChatRoomType(String? type) {
     if (type == null) return ChatRoomType.private;
-    
+
     switch (type.toLowerCase()) {
       case 'group':
         return ChatRoomType.group;
@@ -145,6 +146,19 @@ class ChatRoomModel extends Equatable {
         orElse: () => participants.first,
       );
       return otherParticipant.isOnline;
+    }
+  }
+
+  int? getOtherUserId(String currentUserId) {
+    if (type == ChatRoomType.group) {
+      return null; // No "other user" in group chats
+    } else {
+      // For private chats, get the other participant's ID
+      final otherParticipant = participants.firstWhere(
+        (p) => p.id.toString() != currentUserId,
+        orElse: () => participants.first,
+      );
+      return otherParticipant.id;
     }
   }
 

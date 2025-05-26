@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 
 import '../../widgets/custom_chat_widget_new.dart';
+import '../../widgets/block_user_button.dart';
 import '../../utils/logger.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -36,6 +37,30 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   String get _roomIdString => widget.chatRoom.id.toString();
   int get _roomId => widget.chatRoom.id;
+
+  // Get the other user's ID for private chats (excluding current user)
+  int? get _otherUserId {
+    if (widget.chatRoom.participantIds.length == 2) {
+      try {
+        return widget.chatRoom.participantIds.firstWhere(
+          (id) => id != _currentUserId,
+        );
+      } catch (e) {
+        AppLogger.w('ChatScreen', 'Could not find other user ID: $e');
+        return null;
+      }
+    }
+    return null;
+  }
+
+  // Get the other user's name for private chats
+  String get _otherUserName {
+    if (widget.chatRoom.participantIds.length == 2) {
+      // For private chats, use the room name which should be the other user's name
+      return widget.chatRoom.name ?? 'User';
+    }
+    return widget.chatRoom.name ?? 'Chat';
+  }
 
   @override
   void initState() {
@@ -317,6 +342,87 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     );
   }
 
+  void _showPrivateChatMenu() {
+    final otherUserId = _otherUserId;
+    if (otherUserId == null || otherUserId <= 0) {
+      AppLogger.w(
+        'ChatScreen',
+        'Cannot show private chat menu: invalid other user ID',
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder:
+          (context) => Container(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.block, color: Colors.red),
+                  title: const Text(
+                    'Block User',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _showBlockUserDialog();
+                  },
+                ),
+              ],
+            ),
+          ),
+    );
+  }
+
+  void _showBlockUserDialog() {
+    final otherUserId = _otherUserId;
+    if (otherUserId == null || otherUserId <= 0) {
+      AppLogger.w(
+        'ChatScreen',
+        'Cannot show block dialog: invalid other user ID',
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: Text('Block $_otherUserName?'),
+            content: const Text(
+              'This user will not be able to send you messages. You can unblock them later from Settings > Blocked Users.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              BlockUserButton(
+                userId: otherUserId,
+                userName: _otherUserName,
+                onBlockStatusChanged: () {
+                  Navigator.of(context).pop();
+                  // Optionally navigate back or show a message
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('$_otherUserName has been blocked'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+    );
+  }
+
   void _showLeaveGroupDialog() {
     showDialog(
       context: context,
@@ -393,6 +499,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
             IconButton(
               icon: const Icon(Icons.more_vert),
               onPressed: _showGroupMenu,
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.more_vert),
+              onPressed: _showPrivateChatMenu,
             ),
         ],
       ),
@@ -446,6 +557,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           currentUserId: _currentUserId,
           webSocketService: _uploadService,
           roomId: widget.chatRoom.id,
+          otherUserId: _otherUserId,
+          otherUserName: _otherUserName,
         );
       },
     );

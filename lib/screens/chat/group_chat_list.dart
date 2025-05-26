@@ -6,6 +6,7 @@ import 'package:chatting_application/screens/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/shimmer_widgets.dart';
+import '../../widgets/modern_chat_list_item.dart';
 
 class GroupChatList extends StatefulWidget {
   final ChatProvider chatProvider;
@@ -208,104 +209,61 @@ class _GroupChatListState extends State<GroupChatList>
   }
 
   Widget _buildChatRoomItem(ChatRoom room) {
-    return Consumer<ChatProvider>(
-      builder: (context, chatProvider, child) {
-        final unreadCount = chatProvider.getUnreadCount(room.id.toString());
+    // Get animations for this room
+    final slideAnimation = _slideAnimations[room.id];
+    final fadeAnimation = _fadeAnimations[room.id];
+
+    // Create the modern chat list item
+    final modernChatItem = ModernChatListItem(
+      chatRoom: room,
+      currentUserId: widget.currentUserId,
+      onTap: () {
+        // Mark room as read via WebSocket for real-time updates (non-blocking)
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        chatProvider.markRoomAsRead(room.id.toString());
+
         final apiAuthProvider = Provider.of<ApiAuthProvider>(
           context,
           listen: false,
         );
-
-        // Get animations for this room
-        final slideAnimation = _slideAnimations[room.id];
-        final fadeAnimation = _fadeAnimations[room.id];
-
-        // Create the list tile widget
-        final listTile = Card(
-          margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          elevation: 2,
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Theme.of(context).primaryColor,
-              child: Text(
-                room.name?.substring(0, 1).toUpperCase() ?? 'G',
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-            title: Text(
-              room.name ?? 'Group Chat',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Text(
-              '${room.participantIds.length} members${room.description != null ? ' • ${room.description}' : ''}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            trailing:
-                unreadCount > 0
-                    ? Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).primaryColor,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Text(
-                        unreadCount.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    )
-                    : const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              // Mark room as read via WebSocket for real-time updates (non-blocking)
-              chatProvider.markRoomAsRead(room.id.toString());
-
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder:
-                      (context) => MultiProvider(
-                        providers: [
-                          ChangeNotifierProvider.value(value: chatProvider),
-                          Provider.value(value: widget.webSocketService),
-                          ChangeNotifierProvider.value(value: apiAuthProvider),
-                        ],
-                        child: ChatScreen(chatRoom: room),
-                      ),
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder:
+                (context) => MultiProvider(
+                  providers: [
+                    ChangeNotifierProvider.value(value: chatProvider),
+                    Provider.value(value: widget.webSocketService),
+                    ChangeNotifierProvider.value(value: apiAuthProvider),
+                  ],
+                  child: ChatScreen(chatRoom: room),
                 ),
-              ).then((_) {
-                // Refresh the list when returning from chat screen
-                // This will automatically remove groups the user has left
-                _loadGroupChats();
-              });
-            },
-            onLongPress:
-                () => _showChatRoomContextMenu(context, room, chatProvider),
           ),
-        );
-
-        // Return animated version if animations are available
-        if (slideAnimation != null && fadeAnimation != null) {
-          return AnimatedBuilder(
-            animation: slideAnimation,
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(
-                  slideAnimation.value * 300,
-                  0,
-                ), // Slide to the right
-                child: Opacity(opacity: fadeAnimation.value, child: listTile),
-              );
-            },
-          );
-        }
-
-        // Fallback to non-animated version
-        return listTile;
+        ).then((_) {
+          // Refresh the list when returning from chat screen
+          // This will automatically remove groups the user has left
+          _loadGroupChats();
+        });
       },
+      onLongPress:
+          () => _showChatRoomContextMenu(context, room, widget.chatProvider),
     );
+
+    // Return animated version if animations are available
+    if (slideAnimation != null && fadeAnimation != null) {
+      return AnimatedBuilder(
+        animation: slideAnimation,
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(slideAnimation.value * 300, 0), // Slide to the right
+            child: Opacity(opacity: fadeAnimation.value, child: modernChatItem),
+          );
+        },
+      );
+    }
+
+    // Fallback to non-animated version
+    return modernChatItem;
   }
 
   /// Show context menu for chat room actions

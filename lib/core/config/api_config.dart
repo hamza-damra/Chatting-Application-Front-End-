@@ -14,6 +14,13 @@ class ApiConfig {
   static const String userProfileEndpoint = '/api/users/me';
   static const String userSearchEndpoint = '/api/users/search';
 
+  // User blocking endpoints
+  static const String blockUserEndpoint = '/api/users/blocking/block';
+  static const String unblockUserEndpoint = '/api/users/blocking/unblock';
+  static const String blockedUsersEndpoint = '/api/users/blocking/blocked';
+  static const String isBlockedEndpoint = '/api/users/blocking/is-blocked';
+  static const String blockedUsersCountEndpoint = '/api/users/blocking/count';
+
   // Chat room endpoints
   static const String chatRoomsEndpoint = '/api/chatrooms';
 

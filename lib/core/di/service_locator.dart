@@ -15,12 +15,17 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/repositories/user_repository.dart';
 import '../../domain/repositories/chat_room_repository.dart';
 import '../../domain/repositories/message_repository.dart';
+import '../../domain/repositories/user_blocking_repository.dart';
+import '../../data/repositories/user_blocking_repository_impl.dart';
 import '../../presentation/blocs/auth/auth_bloc.dart';
 import '../../presentation/blocs/users/user_bloc.dart';
 import '../../presentation/blocs/chat/chat_bloc.dart';
 import '../../presentation/blocs/messages/message_bloc.dart';
+import '../../presentation/blocs/user_blocking/user_blocking_bloc.dart';
 import '../../services/api_auth_service.dart';
 import '../../services/api_chat_service.dart';
+import '../../services/user_blocking_service.dart';
+import '../../services/chat_blocking_service.dart';
 import '../../services/websocket_service.dart' as legacy_ws;
 
 final serviceLocator = GetIt.instance;
@@ -59,6 +64,12 @@ Future<void> setupServiceLocator() async {
       tokenService: serviceLocator<TokenService>(),
     ),
   );
+  serviceLocator.registerLazySingleton<UserBlockingService>(
+    () => UserBlockingService(tokenService: serviceLocator<TokenService>()),
+  );
+  serviceLocator.registerLazySingleton<ChatBlockingService>(
+    () => ChatBlockingService(serviceLocator<UserBlockingRepository>()),
+  );
 
   // Repositories
   serviceLocator.registerLazySingleton<AuthRepository>(
@@ -80,6 +91,9 @@ Future<void> setupServiceLocator() async {
       serviceLocator<WebSocketService>(),
     ),
   );
+  serviceLocator.registerLazySingleton<UserBlockingRepository>(
+    () => UserBlockingRepositoryImpl(serviceLocator<UserBlockingService>()),
+  );
 
   // BLoCs
   serviceLocator.registerFactory<AuthBloc>(
@@ -97,6 +111,9 @@ Future<void> setupServiceLocator() async {
   serviceLocator.registerFactory<MessageBloc>(
     () => MessageBloc(serviceLocator<MessageRepository>()),
   );
+  serviceLocator.registerLazySingleton<UserBlockingBloc>(
+    () => UserBlockingBloc(serviceLocator<UserBlockingRepository>()),
+  );
 }
 
 List<BlocProvider> getBlocProviders() {
@@ -106,6 +123,9 @@ List<BlocProvider> getBlocProviders() {
     BlocProvider<ChatBloc>(create: (context) => serviceLocator<ChatBloc>()),
     BlocProvider<MessageBloc>(
       create: (context) => serviceLocator<MessageBloc>(),
+    ),
+    BlocProvider<UserBlockingBloc>(
+      create: (context) => serviceLocator<UserBlockingBloc>(),
     ),
   ];
 }

@@ -5,6 +5,7 @@ import '../widgets/custom_button.dart';
 import '../services/background_notification_manager.dart';
 import 'media_gallery_screen.dart';
 import 'storage_stats_screen.dart';
+import 'blocked_users_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -75,6 +76,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: 'Manage your privacy settings',
           onTap: () {
             // Navigate to privacy settings screen
+          },
+        ),
+        _buildSettingCard(
+          icon: Icons.block,
+          title: 'Blocked Users',
+          subtitle: 'Manage blocked users',
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const BlockedUsersScreen(),
+              ),
+            );
           },
         ),
 

@@ -39,7 +39,7 @@ class WebSocketFileUploader {
 
       AppLogger.i(
         'WebSocketFileUploader',
-        'Starting file upload: $fileName (${fileSize} bytes, $totalChunks chunks)',
+        'Starting file upload: $fileName ($fileSize bytes, $totalChunks chunks)',
       );
 
       // Send chunks sequentially

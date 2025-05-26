@@ -1,19 +1,29 @@
 import 'dart:convert';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../models/unread_message_notification.dart';
 import '../utils/logger.dart';
+import 'navigation_service.dart';
 
 class NotificationService {
   static final FlutterLocalNotificationsPlugin _notifications =
       FlutterLocalNotificationsPlugin();
-  
+
   static bool _initialized = false;
+
+  /// Check if the service is initialized
+  static bool get isInitialized => _initialized;
 
   static Future<void> initialize() async {
     if (_initialized) return;
 
     try {
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      // Request notification permissions first (Android 13+)
+      await _requestNotificationPermissions();
+
+      const androidSettings = AndroidInitializationSettings(
+        '@mipmap/ic_launcher',
+      );
       const iosSettings = DarwinInitializationSettings(
         requestAlertPermission: true,
         requestBadgePermission: true,
@@ -31,30 +41,129 @@ class NotificationService {
       );
 
       if (initialized == true) {
+        // Create notification channels
+        await _createNotificationChannels();
+
         _initialized = true;
-        AppLogger.i('NotificationService', 'Local notifications initialized successfully');
+        AppLogger.i(
+          'NotificationService',
+          'Local notifications initialized successfully',
+        );
       } else {
-        AppLogger.w('NotificationService', 'Failed to initialize local notifications');
+        AppLogger.w(
+          'NotificationService',
+          'Failed to initialize local notifications',
+        );
       }
 
       // Request permissions for Android 13+
       await _requestPermissions();
     } catch (e) {
-      AppLogger.e('NotificationService', 'Error initializing notifications: $e');
+      AppLogger.e(
+        'NotificationService',
+        'Error initializing notifications: $e',
+      );
+    }
+  }
+
+  /// Request notification permissions (Android 13+)
+  static Future<void> _requestNotificationPermissions() async {
+    try {
+      final status = await Permission.notification.status;
+
+      if (status.isDenied) {
+        AppLogger.i(
+          'NotificationService',
+          'Requesting notification permissions...',
+        );
+        final result = await Permission.notification.request();
+
+        if (result.isGranted) {
+          AppLogger.i(
+            'NotificationService',
+            'Notification permissions granted',
+          );
+        } else {
+          AppLogger.w('NotificationService', 'Notification permissions denied');
+        }
+      } else if (status.isGranted) {
+        AppLogger.i(
+          'NotificationService',
+          'Notification permissions already granted',
+        );
+      }
+    } catch (e) {
+      AppLogger.e(
+        'NotificationService',
+        'Error requesting notification permissions: $e',
+      );
+    }
+  }
+
+  /// Create notification channels
+  static Future<void> _createNotificationChannels() async {
+    try {
+      const chatChannel = AndroidNotificationChannel(
+        'chat_messages',
+        'Chat Messages',
+        description: 'Notifications for new chat messages',
+        importance: Importance.high,
+        sound: RawResourceAndroidNotificationSound('notification'),
+        enableVibration: true,
+        playSound: true,
+      );
+
+      const backgroundChannel = AndroidNotificationChannel(
+        'chat_background_messages',
+        'Background Chat Messages',
+        description: 'Notifications for background chat messages',
+        importance: Importance.high,
+        sound: RawResourceAndroidNotificationSound('notification'),
+        enableVibration: true,
+        playSound: true,
+      );
+
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(chatChannel);
+
+      await _notifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(backgroundChannel);
+
+      AppLogger.i('NotificationService', 'Notification channels created');
+    } catch (e) {
+      AppLogger.e(
+        'NotificationService',
+        'Error creating notification channels: $e',
+      );
     }
   }
 
   static Future<void> _requestPermissions() async {
     try {
-      final androidPlugin = _notifications.resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>();
-      
+      final androidPlugin =
+          _notifications
+              .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin
+              >();
+
       if (androidPlugin != null) {
         final granted = await androidPlugin.requestNotificationsPermission();
-        AppLogger.i('NotificationService', 'Android notification permission granted: $granted');
+        AppLogger.i(
+          'NotificationService',
+          'Android notification permission granted: $granted',
+        );
       }
     } catch (e) {
-      AppLogger.e('NotificationService', 'Error requesting notification permissions: $e');
+      AppLogger.e(
+        'NotificationService',
+        'Error requesting notification permissions: $e',
+      );
     }
   }
 
@@ -62,7 +171,10 @@ class NotificationService {
     UnreadMessageNotification notification,
   ) async {
     if (!_initialized) {
-      AppLogger.w('NotificationService', 'Notifications not initialized, skipping notification');
+      AppLogger.w(
+        'NotificationService',
+        'Notifications not initialized, skipping notification',
+      );
       return;
     }
 
@@ -119,9 +231,12 @@ class NotificationService {
     }
   }
 
-  static String _buildNotificationTitle(UnreadMessageNotification notification) {
+  static String _buildNotificationTitle(
+    UnreadMessageNotification notification,
+  ) {
     if (notification.isPrivateChat) {
-      final senderName = notification.senderFullName ?? notification.senderUsername;
+      final senderName =
+          notification.senderFullName ?? notification.senderUsername;
       return 'New message from $senderName';
     } else {
       return 'New message in ${notification.chatRoomName}';
@@ -129,9 +244,11 @@ class NotificationService {
   }
 
   static String _buildNotificationBody(UnreadMessageNotification notification) {
-    final senderName = notification.senderFullName ?? notification.senderUsername;
-    
-    if (notification.contentPreview != null && notification.contentPreview!.isNotEmpty) {
+    final senderName =
+        notification.senderFullName ?? notification.senderUsername;
+
+    if (notification.contentPreview != null &&
+        notification.contentPreview!.isNotEmpty) {
       if (notification.isPrivateChat) {
         return notification.contentPreview!;
       } else {
@@ -144,14 +261,22 @@ class NotificationService {
       case 'image/jpeg':
       case 'image/png':
       case 'image/gif':
-        return notification.isPrivateChat ? '📷 Photo' : '$senderName sent a photo';
+        return notification.isPrivateChat
+            ? '📷 Photo'
+            : '$senderName sent a photo';
       case 'video/mp4':
       case 'video/mpeg':
-        return notification.isPrivateChat ? '🎥 Video' : '$senderName sent a video';
+        return notification.isPrivateChat
+            ? '🎥 Video'
+            : '$senderName sent a video';
       case 'application/pdf':
-        return notification.isPrivateChat ? '📄 Document' : '$senderName sent a document';
+        return notification.isPrivateChat
+            ? '📄 Document'
+            : '$senderName sent a document';
       default:
-        return notification.isPrivateChat ? 'New message' : '$senderName sent a message';
+        return notification.isPrivateChat
+            ? 'New message'
+            : '$senderName sent a message';
     }
   }
 
@@ -161,14 +286,25 @@ class NotificationService {
         final payload = jsonDecode(response.payload!);
         final roomId = payload['roomId'] as int?;
         final messageId = payload['messageId'] as int?;
-        
+
         AppLogger.i(
           'NotificationService',
           'Notification tapped: roomId=$roomId, messageId=$messageId',
         );
 
-        // TODO: Navigate to the specific chat room
-        // This will be implemented when integrating with navigation
+        // Navigate to the specific chat room
+        if (roomId != null) {
+          NavigationService.navigateToChatRoom(roomId);
+          AppLogger.i(
+            'NotificationService',
+            'Navigating to chat room $roomId from notification',
+          );
+        } else {
+          AppLogger.w(
+            'NotificationService',
+            'Cannot navigate: roomId is null in notification payload',
+          );
+        }
       }
     } catch (e) {
       AppLogger.e('NotificationService', 'Error handling notification tap: $e');
@@ -178,7 +314,10 @@ class NotificationService {
   static Future<void> cancelNotification(int notificationId) async {
     try {
       await _notifications.cancel(notificationId);
-      AppLogger.d('NotificationService', 'Cancelled notification $notificationId');
+      AppLogger.d(
+        'NotificationService',
+        'Cancelled notification $notificationId',
+      );
     } catch (e) {
       AppLogger.e('NotificationService', 'Error cancelling notification: $e');
     }
@@ -189,7 +328,10 @@ class NotificationService {
       await _notifications.cancelAll();
       AppLogger.i('NotificationService', 'Cancelled all notifications');
     } catch (e) {
-      AppLogger.e('NotificationService', 'Error cancelling all notifications: $e');
+      AppLogger.e(
+        'NotificationService',
+        'Error cancelling all notifications: $e',
+      );
     }
   }
 
@@ -197,9 +339,64 @@ class NotificationService {
     try {
       // Unfortunately, flutter_local_notifications doesn't support cancelling by group
       // We would need to track notification IDs per room to implement this properly
-      AppLogger.d('NotificationService', 'Cancel notifications for room $roomId requested');
+      AppLogger.d(
+        'NotificationService',
+        'Cancel notifications for room $roomId requested',
+      );
     } catch (e) {
-      AppLogger.e('NotificationService', 'Error cancelling room notifications: $e');
+      AppLogger.e(
+        'NotificationService',
+        'Error cancelling room notifications: $e',
+      );
+    }
+  }
+
+  /// Show a simple test notification (for debugging purposes)
+  static Future<void> showTestNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (!_initialized) {
+      AppLogger.w(
+        'NotificationService',
+        'Notifications not initialized, skipping test notification',
+      );
+      return;
+    }
+
+    try {
+      const androidDetails = AndroidNotificationDetails(
+        'chat_messages',
+        'Chat Messages',
+        channelDescription: 'Test notifications',
+        importance: Importance.high,
+        priority: Priority.high,
+        showWhen: true,
+        autoCancel: true,
+        ongoing: false,
+      );
+
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _notifications.show(id, title, body, details, payload: payload);
+
+      AppLogger.i(
+        'NotificationService',
+        'Showed test notification: $title - $body',
+      );
+    } catch (e) {
+      AppLogger.e('NotificationService', 'Error showing test notification: $e');
     }
   }
 }

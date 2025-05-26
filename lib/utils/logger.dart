@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 class AppLogger {
   static void d(String tag, String message) {
     print('DEBUG: $tag - $message');

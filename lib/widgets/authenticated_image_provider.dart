@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -32,9 +31,9 @@ class AuthenticatedImageProvider
   }
 
   @override
-  ImageStreamCompleter loadBuffer(
+  ImageStreamCompleter loadImage(
     AuthenticatedImageProvider key,
-    DecoderBufferCallback decode,
+    ImageDecoderCallback decode,
   ) {
     // Use the default implementation that calls load
     return MultiFrameImageStreamCompleter(
@@ -51,7 +50,7 @@ class AuthenticatedImageProvider
 
   Future<ui.Codec> _loadAsync(
     AuthenticatedImageProvider key,
-    DecoderBufferCallback decode,
+    ImageDecoderCallback decode,
   ) async {
     try {
       final bytes = await _fetchImageBytes(key.imageUrl);

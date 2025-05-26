@@ -70,6 +70,12 @@ dependencies:
   shimmer: ^3.0.0
   # Local notifications for unread messages
   flutter_local_notifications: ^17.0.0
+  # Permission handling
+  permission_handler: ^11.3.1
+  # App lifecycle management
+  flutter_background_service: ^5.0.10
+  # Device information
+  device_info_plus: ^10.1.2
 dev_dependencies:
   flutter_test:
     sdk: flutter

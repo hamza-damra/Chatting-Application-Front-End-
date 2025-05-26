@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/api_auth_provider.dart';
 import '../widgets/custom_button.dart';
+import '../services/background_notification_manager.dart';
 import 'shimmer_test_screen.dart';
 import 'media_gallery_screen.dart';
 import 'storage_stats_screen.dart';
@@ -20,6 +21,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _notifications = true;
   bool _readReceipts = true;
   bool _typingIndicators = true;
+
+  /// Request background notification permissions
+  Future<void> _requestBackgroundNotificationPermissions() async {
+    try {
+      final granted =
+          await BackgroundNotificationManager.requestPermissionsWithContext(
+            context,
+          );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              granted
+                  ? 'Background notification permissions granted!'
+                  : 'Some permissions were denied. Background notifications may not work properly.',
+            ),
+            backgroundColor: granted ? Colors.green : Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error requesting permissions: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,6 +108,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               // TODO: Implement notification settings - will be addressed in future updates
             });
           },
+        ),
+        _buildSettingCard(
+          icon: Icons.security,
+          title: 'Background Notification Permissions',
+          subtitle: 'Grant permissions for background notifications',
+          onTap: () => _requestBackgroundNotificationPermissions(),
         ),
 
         // Chat Settings Section
@@ -207,6 +246,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: CustomButton(
             text: 'Logout',
             onPressed: () async {
+              final navigator = Navigator.of(context);
+              final scaffoldMessenger = ScaffoldMessenger.of(context);
+
               final confirm = await showDialog<bool>(
                 context: context,
                 builder:
@@ -230,13 +272,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   await authProvider.logout();
                   // Navigate to login screen and clear all previous routes
                   if (mounted) {
-                    Navigator.of(
-                      context,
-                    ).pushNamedAndRemoveUntil('/login', (route) => false);
+                    navigator.pushNamedAndRemoveUntil(
+                      '/login',
+                      (route) => false,
+                    );
                   }
                 } catch (e) {
                   if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
+                    scaffoldMessenger.showSnackBar(
                       SnackBar(
                         content: Text('Error logging out: ${e.toString()}'),
                         backgroundColor: Colors.red,

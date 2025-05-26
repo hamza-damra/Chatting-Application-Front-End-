@@ -2130,12 +2130,16 @@ class WebSocketService {
     try {
       AppLogger.i('WebSocketService', 'Subscribing to unread updates topic');
 
+      // Subscribe to the main unread topic
       _stompClient!.subscribe(
-        destination: '/user/queue/unread',
+        destination: ApiConfig.stompUnreadTopic,
         callback: (StompFrame frame) {
           try {
             final data = jsonDecode(frame.body ?? '{}');
-            AppLogger.i('WebSocketService', 'Received unread update: $data');
+            AppLogger.i(
+              'WebSocketService',
+              'Received unread update from ${ApiConfig.stompUnreadTopic}: $data',
+            );
 
             if (_onUnreadUpdate != null) {
               _onUnreadUpdate!(data);
@@ -2147,9 +2151,30 @@ class WebSocketService {
         headers: {'Authorization': 'Bearer ${_tokenService.accessToken}'},
       );
 
+      // Also subscribe to the alternative unread messages endpoint
+      _stompClient!.subscribe(
+        destination: ApiConfig.stompUnreadMessagesEndpoint,
+        callback: (StompFrame frame) {
+          try {
+            final data = jsonDecode(frame.body ?? '{}');
+            AppLogger.i(
+              'WebSocketService',
+              'Received unread message from ${ApiConfig.stompUnreadMessagesEndpoint}: $data',
+            );
+
+            if (_onUnreadUpdate != null) {
+              _onUnreadUpdate!(data);
+            }
+          } catch (e) {
+            AppLogger.e('WebSocketService', 'Error parsing unread message: $e');
+          }
+        },
+        headers: {'Authorization': 'Bearer ${_tokenService.accessToken}'},
+      );
+
       AppLogger.i(
         'WebSocketService',
-        'Successfully subscribed to unread updates',
+        'Successfully subscribed to unread updates on multiple endpoints',
       );
     } catch (e) {
       AppLogger.e(
@@ -2319,43 +2344,64 @@ class WebSocketService {
     }
 
     try {
-      _stompClient!.subscribe(
-        destination: '/user/unread-messages',
-        callback: (StompFrame frame) {
-          AppLogger.i(
-            'WebSocketService',
-            'Received frame on /user/unread-messages',
-          );
-          if (frame.body != null) {
-            AppLogger.i('WebSocketService', 'Frame body: ${frame.body}');
-            try {
-              final notificationData = jsonDecode(frame.body!);
-              AppLogger.i(
-                'WebSocketService',
-                'Parsed notification data: $notificationData',
-              );
-              final notification = UnreadMessageNotification.fromJson(
-                notificationData,
-              );
+      // Subscribe to new notification endpoints from backend documentation
+      final newEndpoints = [
+        ApiConfig.stompNotificationsEndpoint,
+        ApiConfig.stompUnreadNotificationsEndpoint,
+        ApiConfig.stompUnreadCountEndpoint,
+      ];
 
-              AppLogger.i(
-                'WebSocketService',
-                'Successfully created notification: ${notification.senderUsername} in ${notification.chatRoomName}',
-              );
+      // Subscribe to legacy endpoints for backward compatibility
+      final legacyEndpoints = [
+        ApiConfig.stompUnreadMessagesEndpoint,
+        ApiConfig.stompUnreadTopic,
+        ApiConfig.stompUserStatusTopic,
+      ];
 
-              _onUnreadNotificationReceived?.call(notification);
-            } catch (e) {
-              AppLogger.e(
+      final allEndpoints = [...newEndpoints, ...legacyEndpoints];
+
+      for (final endpoint in allEndpoints) {
+        _stompClient!.subscribe(
+          destination: endpoint,
+          callback: (StompFrame frame) {
+            AppLogger.i('WebSocketService', 'Received frame on $endpoint');
+            if (frame.body != null) {
+              AppLogger.i('WebSocketService', 'Frame body: ${frame.body}');
+              try {
+                final notificationData = jsonDecode(frame.body!);
+                AppLogger.i(
+                  'WebSocketService',
+                  'Parsed notification data: $notificationData',
+                );
+                final notification = UnreadMessageNotification.fromJson(
+                  notificationData,
+                );
+
+                AppLogger.i(
+                  'WebSocketService',
+                  'Successfully created notification: ${notification.senderUsername} in ${notification.chatRoomName}',
+                );
+
+                _onUnreadNotificationReceived?.call(notification);
+              } catch (e) {
+                AppLogger.e(
+                  'WebSocketService',
+                  'Error parsing unread message notification from $endpoint: $e',
+                );
+                AppLogger.e(
+                  'WebSocketService',
+                  'Raw frame body: ${frame.body}',
+                );
+              }
+            } else {
+              AppLogger.w(
                 'WebSocketService',
-                'Error parsing unread message notification: $e',
+                'Received frame with null body from $endpoint',
               );
-              AppLogger.e('WebSocketService', 'Raw frame body: ${frame.body}');
             }
-          } else {
-            AppLogger.w('WebSocketService', 'Received frame with null body');
-          }
-        },
-      );
+          },
+        );
+      }
 
       AppLogger.i(
         'WebSocketService',

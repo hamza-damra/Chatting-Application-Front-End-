@@ -73,6 +73,8 @@ class _EnhancedFileViewerState extends State<EnhancedFileViewer> {
 
   Future<void> _launchUrl(BuildContext context, String url) async {
     final Uri uri = Uri.parse(url);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     try {
       final launched = await launchUrl(
         uri,
@@ -81,7 +83,7 @@ class _EnhancedFileViewerState extends State<EnhancedFileViewer> {
       if (!mounted) return;
 
       if (!launched) {
-        ScaffoldMessenger.of(context).showSnackBar(
+        scaffoldMessenger.showSnackBar(
           const SnackBar(
             content: Text('Could not open file externally'),
             backgroundColor: Colors.red,
@@ -90,7 +92,7 @@ class _EnhancedFileViewerState extends State<EnhancedFileViewer> {
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('Error opening file: ${e.toString()}'),
           backgroundColor: Colors.red,

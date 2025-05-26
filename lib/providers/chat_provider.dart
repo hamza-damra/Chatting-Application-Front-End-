@@ -11,6 +11,11 @@ import '../models/user_model.dart';
 import '../utils/logger.dart';
 import '../providers/api_auth_provider.dart';
 import '../models/unread_message_notification.dart';
+import '../services/spring_boot_push_manager.dart';
+import '../core/di/service_locator.dart';
+import '../core/services/token_service.dart';
+import '../services/background_notification_manager.dart';
+import '../services/notification_service.dart';
 import '../utils/url_utils.dart';
 
 class ChatProvider with ChangeNotifier {
@@ -28,6 +33,9 @@ class ChatProvider with ChangeNotifier {
   types.Room? _selectedRoom;
   List<UserModel> _users = [];
   final Map<String, int> _unreadMessageCounts = {};
+
+  // Track when the current user joined each room (to calculate accurate unread counts)
+  final Map<String, DateTime> _userJoinTimes = {};
 
   // Track active WebSocket subscriptions to prevent duplicates
   final Set<String> _activeSubscriptions = {};
@@ -441,7 +449,7 @@ class ChatProvider with ChangeNotifier {
     return calculatedCount >= 0 ? calculatedCount : 0;
   }
 
-  // Calculate actual unread count based on message statuses
+  // Calculate actual unread count based on message statuses and join time
   int _calculateActualUnreadCount(String roomId) {
     try {
       final messages = _messages[roomId] ?? [];
@@ -452,20 +460,49 @@ class ChatProvider with ChangeNotifier {
 
       int unreadCount = 0;
       final currentUserId = _authProvider.user?.id.toString();
+      final userJoinTime = _userJoinTimes[roomId];
+
+      AppLogger.d(
+        'ChatProvider',
+        'Calculating unread count for room $roomId. User joined at: $userJoinTime',
+      );
 
       for (final message in messages) {
-        // Only count messages from other users
-        if (message.author.id != currentUserId) {
+        // Only count messages from other users and exclude system messages
+        if (message.author.id != currentUserId &&
+            message is! types.SystemMessage) {
+          // If we know when the user joined, only count messages sent after they joined
+          if (userJoinTime != null) {
+            final messageTime =
+                message.createdAt != null
+                    ? DateTime.fromMillisecondsSinceEpoch(message.createdAt!)
+                    : DateTime.now();
+
+            // Skip messages that were sent before the user joined
+            if (messageTime.isBefore(userJoinTime)) {
+              AppLogger.d(
+                'ChatProvider',
+                'Skipping message ${message.id} sent before user joined ($messageTime < $userJoinTime)',
+              );
+              continue;
+            }
+          }
+
           // Count messages that are not read by current user
           if (message.status != types.Status.seen) {
             unreadCount++;
           }
+        } else if (message is types.SystemMessage) {
+          AppLogger.d(
+            'ChatProvider',
+            'Skipping system message ${message.id} from unread count calculation',
+          );
         }
       }
 
       AppLogger.d(
         'ChatProvider',
-        'Calculated unread count for room $roomId: $unreadCount (from ${messages.length} messages)',
+        'Calculated unread count for room $roomId: $unreadCount (from ${messages.length} messages, joined at: $userJoinTime)',
       );
 
       return unreadCount;
@@ -516,6 +553,119 @@ class ChatProvider with ChangeNotifier {
 
     // Subscribe to rich unread message notifications
     _subscribeToUnreadNotifications();
+
+    // Initialize push notifications if user is authenticated
+    await _initializePushNotifications();
+  }
+
+  // Initialize push notifications
+  Future<void> _initializePushNotifications() async {
+    try {
+      final user = _authProvider.user;
+      if (user != null) {
+        AppLogger.i(
+          'ChatProvider',
+          'Initializing push notifications for user: ${user.id}',
+        );
+
+        // Get auth token from service locator
+        final tokenService = serviceLocator<TokenService>();
+        final authToken = await tokenService.getAccessToken() ?? '';
+
+        if (authToken.isEmpty) {
+          AppLogger.w(
+            'ChatProvider',
+            'No auth token available for push notifications',
+          );
+          return;
+        }
+
+        await SpringBootPushManager.initialize(
+          userId: user.id.toString(),
+          authToken: authToken,
+          onDeviceRegistered: (deviceId) {
+            AppLogger.i('ChatProvider', 'Device registered: $deviceId');
+          },
+          onMessageReceived: (messageData) {
+            AppLogger.i(
+              'ChatProvider',
+              'Push notification received: $messageData',
+            );
+            _handlePushNotification(messageData);
+          },
+        );
+
+        // Update user status to online
+        await SpringBootPushManager.updateUserStatus(
+          isOnline: true,
+          activeRoomId: _selectedRoom?.id,
+        );
+
+        AppLogger.i(
+          'ChatProvider',
+          'Push notifications initialized successfully',
+        );
+      } else {
+        AppLogger.w(
+          'ChatProvider',
+          'User not authenticated, skipping push notification initialization',
+        );
+      }
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error initializing push notifications: $e');
+    }
+  }
+
+  // Handle incoming push notifications
+  void _handlePushNotification(Map<String, dynamic> messageData) {
+    try {
+      final type = messageData['type'] as String?;
+
+      if (type == 'chat_message') {
+        final chatRoomId = messageData['chatRoomId'] as String?;
+        final senderName = messageData['senderName'] as String?;
+        final messageContent = messageData['messageContent'] as String?;
+
+        AppLogger.i(
+          'ChatProvider',
+          'Handling chat message push notification for room: $chatRoomId',
+        );
+
+        // If the user is not currently in this chat room, show notification
+        if (_selectedRoom?.id != chatRoomId) {
+          // Create notification object
+          final notification = UnreadMessageNotification(
+            messageId: int.tryParse(messageData['messageId'] ?? '0') ?? 0,
+            chatRoomId: int.tryParse(chatRoomId ?? '0') ?? 0,
+            chatRoomName: messageData['chatRoomName'] ?? 'New Message',
+            senderId: int.tryParse(messageData['senderId'] ?? '0') ?? 0,
+            senderUsername: senderName ?? 'Unknown',
+            senderFullName: senderName,
+            contentPreview: messageContent,
+            contentType: messageData['contentType'] ?? 'TEXT',
+            sentAt:
+                DateTime.tryParse(messageData['timestamp'] ?? '') ??
+                DateTime.now(),
+            notificationTimestamp: DateTime.now(),
+            unreadCount: 1,
+            totalUnreadCount: 1,
+            recipientUserId: currentUserId,
+            isPrivateChat: messageData['isPrivateChat'] == true,
+            participantCount:
+                int.tryParse(messageData['participantCount'] ?? '2') ?? 2,
+            attachmentUrl: messageData['attachmentUrl'],
+            notificationType: NotificationType.newMessage,
+          );
+
+          // Forward to notification provider
+          if (_onNotificationReceived != null) {
+            _onNotificationReceived!(notification);
+          }
+        }
+      }
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error handling push notification: $e');
+    }
   }
 
   // Set up notification callback (called from main app)
@@ -618,12 +768,26 @@ class ChatProvider with ChangeNotifier {
       if (chatRoomId != null) {
         // Update the unread count for the specific room
         final previousCount = _unreadMessageCounts[chatRoomId] ?? 0;
-        _unreadMessageCounts[chatRoomId] = unreadCount;
 
-        AppLogger.i(
-          'ChatProvider',
-          'Real-time unread update: Room $chatRoomId: $previousCount -> $unreadCount (Type: $updateType)',
-        );
+        // Only update if server count is higher than local count
+        // This prevents server updates from overriding local increments
+        if (unreadCount >= previousCount) {
+          _unreadMessageCounts[chatRoomId] = unreadCount;
+          AppLogger.i(
+            'ChatProvider',
+            'Real-time unread update: Room $chatRoomId: $previousCount -> $unreadCount (Type: $updateType)',
+          );
+
+          // Show notification for new unread messages if not in the active room
+          if (unreadCount > previousCount && _selectedRoom?.id != chatRoomId) {
+            _showBackgroundNotificationFromUnreadUpdate(chatRoomId, unreadData);
+          }
+        } else {
+          AppLogger.i(
+            'ChatProvider',
+            'Preserving higher local count for room $chatRoomId: local=$previousCount, server=$unreadCount (Type: $updateType)',
+          );
+        }
 
         // Update room metadata if available
         if (unreadData.containsKey('latestMessageContent')) {
@@ -748,6 +912,19 @@ class ChatProvider with ChangeNotifier {
     try {
       _rooms = await _chatService.getChatRooms();
 
+      // For existing rooms, set a reasonable default join time
+      // Use a time far in the past so existing unread messages are preserved
+      final defaultJoinTime = DateTime.now().subtract(const Duration(days: 30));
+      for (final room in _rooms) {
+        if (!_userJoinTimes.containsKey(room.id)) {
+          _userJoinTimes[room.id] = defaultJoinTime;
+          AppLogger.i(
+            'ChatProvider',
+            'Set default join time for existing room ${room.id}: $defaultJoinTime (30 days ago)',
+          );
+        }
+      }
+
       // Sync unread counts from server data
       _syncUnreadCountsFromServer();
 
@@ -799,12 +976,21 @@ class ChatProvider with ChangeNotifier {
 
         if (roomId.isNotEmpty) {
           final previousCount = _unreadMessageCounts[roomId] ?? 0;
-          _unreadMessageCounts[roomId] = unreadCount;
 
-          if (previousCount != unreadCount) {
+          // Only update if server count is higher than local count
+          // This preserves local increments that haven't been synced to server yet
+          if (unreadCount >= previousCount) {
+            _unreadMessageCounts[roomId] = unreadCount;
+            if (previousCount != unreadCount) {
+              AppLogger.i(
+                'ChatProvider',
+                'Synced unread count for room $roomId: $previousCount -> $unreadCount',
+              );
+            }
+          } else {
             AppLogger.i(
               'ChatProvider',
-              'Synced unread count for room $roomId: $previousCount -> $unreadCount',
+              'Preserving higher local count for room $roomId: local=$previousCount, server=$unreadCount',
             );
           }
         }
@@ -855,6 +1041,21 @@ class ChatProvider with ChangeNotifier {
 
       // Clear unread count immediately when entering a room
       _unreadMessageCounts[existingRoom.id] = 0;
+
+      // Only set join time if it doesn't exist (don't overwrite existing join times)
+      if (!_userJoinTimes.containsKey(existingRoom.id)) {
+        // For rooms we're selecting for the first time, set join time to now
+        _userJoinTimes[existingRoom.id] = DateTime.now();
+        AppLogger.i(
+          'ChatProvider',
+          'Set initial join time for room ${existingRoom.id}: ${_userJoinTimes[existingRoom.id]}',
+        );
+      } else {
+        AppLogger.d(
+          'ChatProvider',
+          'Preserving existing join time for room ${existingRoom.id}: ${_userJoinTimes[existingRoom.id]}',
+        );
+      }
 
       // Load messages for this room
       await _loadMessages(existingRoom.id);
@@ -1120,6 +1321,11 @@ class ChatProvider with ChangeNotifier {
               'Adding new message from WebSocket: ${message.id}, from current user: $isFromCurrentUser',
             );
 
+            // Handle system messages (JOIN/LEAVE) to track user join times
+            if (message is types.SystemMessage) {
+              _handleSystemMessage(roomId, message);
+            }
+
             // For messages from other users, ensure they have a proper status
             if (message is types.TextMessage) {
               message = message.copyWith(status: types.Status.sent);
@@ -1129,18 +1335,43 @@ class ChatProvider with ChangeNotifier {
 
             _addMessageToList(roomId, message);
 
-            // If this is not the currently selected room and not from current user, increment unread count
-            if (_selectedRoom?.id != roomId && !isFromCurrentUser) {
+            // Only increment unread count for actual chat messages (not system messages)
+            // System messages (JOIN/LEAVE) should not count as unread
+            final shouldIncrementUnread =
+                _selectedRoom?.id != roomId &&
+                !isFromCurrentUser &&
+                message is! types.SystemMessage;
+
+            if (shouldIncrementUnread) {
               final previousCount = _unreadMessageCounts[roomId] ?? 0;
               _unreadMessageCounts[roomId] = previousCount + 1;
               AppLogger.i(
                 'ChatProvider',
-                'Incremented unread count for room $roomId: $previousCount -> ${_unreadMessageCounts[roomId]}',
+                'Incremented unread count for room $roomId: $previousCount -> ${_unreadMessageCounts[roomId]} (message type: ${message.runtimeType})',
               );
+
+              // Show background notification for new messages from other users
+              // Only if user is not currently viewing this room
+              if (_selectedRoom?.id != roomId) {
+                _showBackgroundNotificationForMessage(roomId, message);
+              } else {
+                AppLogger.d(
+                  'ChatProvider',
+                  'Skipping notification for room $roomId - user is actively viewing this room',
+                );
+              }
             } else {
+              final reason =
+                  _selectedRoom?.id == roomId
+                      ? 'room is selected'
+                      : isFromCurrentUser
+                      ? 'message from current user'
+                      : message is types.SystemMessage
+                      ? 'system message (JOIN/LEAVE)'
+                      : 'unknown reason';
               AppLogger.d(
                 'ChatProvider',
-                'Not incrementing unread count for room $roomId: selectedRoom=${_selectedRoom?.id}, isFromCurrentUser=$isFromCurrentUser',
+                'Not incrementing unread count for room $roomId: $reason (message type: ${message.runtimeType})',
               );
             }
           }
@@ -1927,6 +2158,20 @@ class ChatProvider with ChangeNotifier {
   }) async {
     try {
       await _chatService.addParticipantToRoom(roomId: roomId, userId: userId);
+
+      // If the current user is being added to the room, track their join time
+      if (userId == currentUserId) {
+        final roomIdStr = roomId.toString();
+        _userJoinTimes[roomIdStr] = DateTime.now();
+        AppLogger.i(
+          'ChatProvider',
+          'Tracked join time for current user in room $roomIdStr: ${_userJoinTimes[roomIdStr]}',
+        );
+
+        // Recalculate unread count with the new join time
+        _recalculateUnreadCount(roomIdStr);
+      }
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -1950,6 +2195,213 @@ class ChatProvider with ChangeNotifier {
       );
     } catch (e) {
       AppLogger.e('ChatProvider', 'Error sending real-time message: $e');
+    }
+  }
+
+  // Handle system messages to track user join times
+  void _handleSystemMessage(String roomId, types.SystemMessage message) {
+    try {
+      final currentUserId = _authProvider.user?.id.toString();
+
+      // Check if this is a JOIN message for the current user
+      if (message.text.toLowerCase().contains('joined') &&
+          message.text.contains(currentUserId ?? '')) {
+        // Update the join time for this room
+        _userJoinTimes[roomId] = DateTime.now();
+        AppLogger.i(
+          'ChatProvider',
+          'Updated join time for current user in room $roomId via system message: ${_userJoinTimes[roomId]}',
+        );
+
+        // Recalculate unread count with the new join time
+        _recalculateUnreadCount(roomId);
+      }
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error handling system message: $e');
+    }
+  }
+
+  // Get the join time for a specific room (for testing purposes)
+  DateTime? getUserJoinTime(String roomId) {
+    return _userJoinTimes[roomId];
+  }
+
+  /// Show background notification for new messages when app is in background
+  void _showBackgroundNotificationForMessage(
+    String roomId,
+    types.Message message,
+  ) {
+    try {
+      // Check if we should show notification based on app state and active room
+      if (!_shouldShowNotificationForMessage(roomId)) {
+        AppLogger.i(
+          'ChatProvider',
+          'Skipping notification for room $roomId - user is actively viewing this room',
+        );
+        return;
+      }
+
+      // Get room information
+      final room = _rooms.firstWhere(
+        (r) => r.id == roomId,
+        orElse:
+            () => types.Room(
+              id: roomId,
+              type: types.RoomType.direct,
+              users: [],
+              name: 'Chat',
+            ),
+      );
+
+      // Extract message content
+      String messageContent = 'New message';
+      if (message is types.TextMessage) {
+        messageContent = message.text;
+      } else if (message is types.ImageMessage) {
+        messageContent = '📷 Image';
+      } else if (message is types.FileMessage) {
+        messageContent = '📎 File';
+      } else if (message is types.CustomMessage) {
+        messageContent =
+            message.metadata?['type'] == 'video' ? '🎥 Video' : '📎 Attachment';
+      }
+
+      // Get sender information
+      final senderName =
+          message.author.firstName ?? message.author.lastName ?? 'Someone';
+      final unreadCount = _unreadMessageCounts[roomId] ?? 1;
+
+      // Create notification data
+      final notificationData = {
+        'chatRoomId': roomId,
+        'chatRoomName': room.name ?? 'Chat',
+        'senderName': senderName,
+        'messageContent': messageContent,
+        'unreadCount': unreadCount,
+        'type': 'chat_message',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      AppLogger.i(
+        'ChatProvider',
+        'Triggering background notification for room $roomId: $senderName - $messageContent',
+      );
+
+      // Send to background notification manager
+      BackgroundNotificationManager.instance.updateActiveRoom(
+        _selectedRoom?.id, // Current active room (null if none selected)
+      );
+
+      // Show the notification via NotificationService
+      NotificationService.showTestNotification(
+        id: DateTime.now().millisecondsSinceEpoch % 2147483647,
+        title: room.name ?? 'Chat',
+        body: '$senderName: $messageContent',
+        payload: jsonEncode(notificationData),
+      );
+
+      AppLogger.i(
+        'ChatProvider',
+        'Background notification shown for room $roomId',
+      );
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error showing background notification: $e');
+    }
+  }
+
+  /// Show background notification from unread update data
+  void _showBackgroundNotificationFromUnreadUpdate(
+    String roomId,
+    Map<String, dynamic> unreadData,
+  ) {
+    try {
+      // Check if we should show notification based on app state and active room
+      if (!_shouldShowNotificationForMessage(roomId)) {
+        AppLogger.i(
+          'ChatProvider',
+          'Skipping unread notification for room $roomId - user is actively viewing this room',
+        );
+        return;
+      }
+
+      // Extract notification data from unread update
+      final chatRoomName = unreadData['chatRoomName']?.toString() ?? 'Chat';
+      final senderName =
+          unreadData['latestMessageSender']?.toString() ?? 'Someone';
+      final messageContent =
+          unreadData['latestMessageContent']?.toString() ?? 'New message';
+      final unreadCount = unreadData['unreadCount'] as int? ?? 1;
+
+      // Create notification data
+      final notificationData = {
+        'chatRoomId': roomId,
+        'chatRoomName': chatRoomName,
+        'senderName': senderName,
+        'messageContent': messageContent,
+        'unreadCount': unreadCount,
+        'type': 'unread_update',
+        'timestamp':
+            unreadData['timestamp'] ?? DateTime.now().toIso8601String(),
+      };
+
+      AppLogger.i(
+        'ChatProvider',
+        'Triggering background notification from unread update for room $roomId: $senderName - $messageContent',
+      );
+
+      // Update active room in background notification manager
+      BackgroundNotificationManager.instance.updateActiveRoom(
+        _selectedRoom?.id,
+      );
+
+      // Show the notification via NotificationService
+      NotificationService.showTestNotification(
+        id: DateTime.now().millisecondsSinceEpoch % 2147483647,
+        title: chatRoomName,
+        body: '$senderName: $messageContent',
+        payload: jsonEncode(notificationData),
+      );
+
+      AppLogger.i(
+        'ChatProvider',
+        'Background notification shown from unread update for room $roomId',
+      );
+    } catch (e) {
+      AppLogger.e(
+        'ChatProvider',
+        'Error showing background notification from unread update: $e',
+      );
+    }
+  }
+
+  /// Determine if notification should be shown for a message
+  bool _shouldShowNotificationForMessage(String roomId) {
+    try {
+      // Don't show notification if user is currently viewing this room
+      if (_selectedRoom?.id == roomId) {
+        AppLogger.d(
+          'ChatProvider',
+          'Not showing notification for room $roomId - user is actively viewing this room',
+        );
+        return false;
+      }
+
+      // Check if app is in background using BackgroundNotificationManager
+      final backgroundManager = BackgroundNotificationManager.instance;
+
+      // Update the active room in background manager
+      backgroundManager.updateActiveRoom(_selectedRoom?.id);
+
+      AppLogger.d(
+        'ChatProvider',
+        'Showing notification for room $roomId - user is not in this room (active room: ${_selectedRoom?.id})',
+      );
+
+      return true;
+    } catch (e) {
+      AppLogger.e('ChatProvider', 'Error checking notification conditions: $e');
+      // Default to showing notification if we can't determine the state
+      return true;
     }
   }
 }

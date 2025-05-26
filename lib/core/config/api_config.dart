@@ -26,9 +26,14 @@ class ApiConfig {
   // STOMP destinations
   static const String stompChatTopic = '/topic/chatrooms/';
   static const String stompUserStatusTopic = '/user/queue/notifications';
+  static const String stompUnreadTopic = '/user/queue/unread';
+  static const String stompUnreadMessagesEndpoint = '/user/unread-messages';
   static const String stompSendMessageEndpoint = '/app/chat.sendMessage';
   static const String stompAddUserEndpoint = '/app/chat.addUser';
   static const String stompLeaveRoomEndpoint = '/app/chat.leaveRoom';
+  static const String stompGetUnreadCountsEndpoint =
+      '/app/chat.getUnreadCounts';
+  static const String stompMarkRoomAsReadEndpoint = '/app/chat.markRoomAsRead';
 
   // Get auth headers
   static Map<String, String> getAuthHeaders(String token) {

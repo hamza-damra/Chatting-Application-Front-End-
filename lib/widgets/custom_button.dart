@@ -66,12 +66,12 @@ class CustomButton extends StatelessWidget {
           height: 20,
           baseColor:
               isOutlined
-                  ? theme.colorScheme.primary.withOpacity(0.3)
-                  : Colors.white.withOpacity(0.3),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                  : Colors.white.withValues(alpha: 0.3),
           highlightColor:
               isOutlined
-                  ? theme.colorScheme.primary.withOpacity(0.7)
-                  : Colors.white.withOpacity(0.7),
+                  ? theme.colorScheme.primary.withValues(alpha: 0.7)
+                  : Colors.white.withValues(alpha: 0.7),
         )
         : Text(
           text,

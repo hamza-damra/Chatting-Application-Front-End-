@@ -27,17 +27,42 @@ class ApiConfig {
   // WebSocket endpoints
   static const String webSocketEndpoint = 'ws://abusaker.zapto.org:8080/ws';
 
-  // STOMP destinations
+  // STOMP destinations - Updated to match backend documentation
   static const String stompChatTopic = '/topic/chatrooms/';
+
+  // Notification subscription endpoints (client subscribes to these)
+  static const String stompNotificationsEndpoint = '/user/notifications';
+  static const String stompUnreadNotificationsEndpoint =
+      '/user/notifications/unread';
+  static const String stompUnreadCountEndpoint =
+      '/user/notifications/unread-count';
+  static const String stompNotificationErrorEndpoint =
+      '/user/notifications/error';
+  static const String stompReadAllConfirmationEndpoint =
+      '/user/notifications/read-all-confirmation';
+
+  // Legacy endpoints for backward compatibility
   static const String stompUserStatusTopic = '/user/queue/notifications';
-  // The backend expects '/app/chat.sendMessage/{roomId}' format
-  // We'll use a template that will be completed with the roomId
-  static const String stompSendMessageEndpoint =
-      '/app/chat.sendMessage'; // Base endpoint, roomId will be appended
-  static const String stompAddUserEndpoint =
-      '/app/chat.addUser'; // Add back '/app' prefix
-  static const String stompLeaveRoomEndpoint =
-      '/app/chat.leaveRoom'; // Add back '/app' prefix
+  static const String stompUnreadTopic = '/user/queue/unread';
+  static const String stompUnreadMessagesEndpoint = '/user/unread-messages';
+
+  // Chat message destinations
+  static const String stompSendMessageEndpoint = '/app/chat.sendMessage';
+  static const String stompAddUserEndpoint = '/app/chat.addUser';
+  static const String stompLeaveRoomEndpoint = '/app/chat.leaveRoom';
+  static const String stompGetUnreadCountsEndpoint =
+      '/app/chat.getUnreadCounts';
+  static const String stompMarkRoomAsReadEndpoint = '/app/chat.markRoomAsRead';
+
+  // Notification command destinations (client sends to these)
+  static const String stompGetUnreadNotificationsEndpoint =
+      '/app/notifications.getUnread';
+  static const String stompMarkNotificationAsReadEndpoint =
+      '/app/notifications.markAsRead';
+  static const String stompMarkAllNotificationsAsReadEndpoint =
+      '/app/notifications.markAllAsRead';
+  static const String stompGetUnreadNotificationCountEndpoint =
+      '/app/notifications.getUnreadCount';
 
   // Headers
   static Map<String, String> getAuthHeaders(String token) {

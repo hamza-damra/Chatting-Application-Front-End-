@@ -245,7 +245,10 @@ class _ProfessionalChatInputState extends State<ProfessionalChatInput>
 
   Widget _buildInputField(ThemeData theme, bool isDark) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 44),
+      constraints: const BoxConstraints(
+        minHeight: 44,
+        maxHeight: 120, // Limit maximum height to prevent excessive expansion
+      ),
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(24),
@@ -257,36 +260,62 @@ class _ProfessionalChatInputState extends State<ProfessionalChatInput>
           width: _isFocused ? 1.5 : 0.8,
         ),
       ),
-      child: TextField(
-        controller: widget.controller,
-        focusNode: _focusNode,
-        enabled: widget.isEnabled,
-        minLines: widget.minLines,
-        maxLines: widget.maxLines,
-        textCapitalization: TextCapitalization.sentences,
-        textInputAction: TextInputAction.newline,
-        onSubmitted: (_) => _handleSendMessage(),
-        style: theme.textTheme.bodyLarge?.copyWith(
-          color: theme.colorScheme.onSurface,
-          height: 1.4,
+      child: Theme(
+        // Override the global theme to prevent focus border overflow
+        data: theme.copyWith(
+          inputDecorationTheme: const InputDecorationTheme(
+            border: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            disabledBorder: InputBorder.none,
+            errorBorder: InputBorder.none,
+            focusedErrorBorder: InputBorder.none,
+            filled: false,
+            isDense: true,
+          ),
         ),
-        decoration: InputDecoration(
-          hintText: widget.hintText,
-          hintStyle: theme.textTheme.bodyLarge?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-            height: 1.4,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: Scrollbar(
+            child: TextField(
+              controller: widget.controller,
+              focusNode: _focusNode,
+              enabled: widget.isEnabled,
+              minLines: widget.minLines,
+              maxLines: widget.maxLines,
+              textCapitalization: TextCapitalization.sentences,
+              textInputAction: TextInputAction.newline,
+              onSubmitted: (_) => _handleSendMessage(),
+              scrollPhysics: const BouncingScrollPhysics(),
+              textAlignVertical: TextAlignVertical.center,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: theme.colorScheme.onSurface,
+                height: 1.4,
+                overflow: TextOverflow.visible, // Ensure text wraps properly
+              ),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: theme.textTheme.bodyLarge?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+                border: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                disabledBorder: InputBorder.none,
+                errorBorder: InputBorder.none,
+                focusedErrorBorder: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
+                isDense: true,
+                filled: false,
+                // Ensure the input decoration doesn't cause overflow
+                isCollapsed: false,
+              ),
+            ),
           ),
-          border: InputBorder.none,
-          focusedBorder: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          disabledBorder: InputBorder.none,
-          errorBorder: InputBorder.none,
-          focusedErrorBorder: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 20,
-            vertical: 12,
-          ),
-          isDense: true,
         ),
       ),
     );

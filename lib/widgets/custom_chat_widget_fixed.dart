@@ -434,29 +434,66 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
           ),
           const SizedBox(width: 8),
           Expanded(
-            child: TextField(
-              controller: _messageController,
-              decoration: InputDecoration(
-                hintText: 'Type a message...',
-                hintStyle: TextStyle(color: Colors.grey.shade400),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(24),
-                  borderSide: BorderSide.none,
+            child: Container(
+              constraints: const BoxConstraints(
+                maxHeight:
+                    120, // Limit maximum height to prevent excessive expansion
+              ),
+              decoration: BoxDecoration(
+                color: _lightGrey,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: Theme(
+                // Override the global theme to prevent focus border overflow
+                data: Theme.of(context).copyWith(
+                  inputDecorationTheme: const InputDecorationTheme(
+                    border: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    disabledBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    filled: false,
+                    isDense: true,
+                  ),
                 ),
-                filled: true,
-                fillColor: _lightGrey,
-                isDense: true,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Scrollbar(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
+                        hintStyle: TextStyle(color: Colors.grey.shade400),
+                        border: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        disabledBorder: InputBorder.none,
+                        errorBorder: InputBorder.none,
+                        focusedErrorBorder: InputBorder.none,
+                        filled: false,
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        overflow:
+                            TextOverflow.visible, // Ensure text wraps properly
+                      ),
+                      textCapitalization: TextCapitalization.sentences,
+                      minLines: 1,
+                      maxLines: 5,
+                      onSubmitted: (_) => _sendMessage(),
+                      textInputAction: TextInputAction.send,
+                      scrollPhysics: const BouncingScrollPhysics(),
+                      textAlignVertical: TextAlignVertical.center,
+                    ),
+                  ),
                 ),
               ),
-              style: const TextStyle(fontSize: 16),
-              textCapitalization: TextCapitalization.sentences,
-              minLines: 1,
-              maxLines: 5,
-              onSubmitted: (_) => _sendMessage(),
-              textInputAction: TextInputAction.send,
             ),
           ),
           const SizedBox(width: 8),

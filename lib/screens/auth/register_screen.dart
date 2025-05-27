@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/api_auth_provider.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/password_text_field.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -85,7 +86,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                   // Title
                   Text(
-                    'Join Chat App',
+                    'Join Vector',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -146,11 +147,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 16),
 
                   // Password Field
-                  CustomTextField(
+                  PasswordTextField(
                     label: 'Password',
                     hint: 'Enter your password',
                     controller: _passwordController,
-                    obscureText: true,
                     prefixIcon: const Icon(Icons.lock_outline),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -165,11 +165,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   const SizedBox(height: 16),
 
                   // Confirm Password Field
-                  CustomTextField(
+                  PasswordTextField(
                     label: 'Confirm Password',
                     hint: 'Confirm your password',
                     controller: _confirmPasswordController,
-                    obscureText: true,
                     prefixIcon: const Icon(Icons.lock_outline),
                     validator: (value) {
                       if (value == null || value.isEmpty) {

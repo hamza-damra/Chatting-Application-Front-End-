@@ -76,8 +76,23 @@ class UrlUtils {
       print('Normalizing URL: $url');
     }
 
-    // If URL already contains our base URL, don't add it again
+    // If URL already contains our base URL, check if it needs conversion to download endpoint
     if (url.startsWith(ApiConfig.baseUrl)) {
+      // Check if this is the old /api/files/{id} format that needs conversion
+      final fileIdPattern = RegExp(r'/api/files/(\d+)$');
+      final match = fileIdPattern.firstMatch(url);
+      if (match != null) {
+        final fileId = match.group(1);
+        // Convert to download endpoint format - we'll assume .mp4 for videos
+        // The actual filename should be determined by the calling code
+        String normalizedUrl =
+            '${ApiConfig.baseUrl}/api/files/download/$fileId.mp4';
+        if (kDebugMode) {
+          print('Converted file ID URL to download format: $normalizedUrl');
+        }
+        return normalizedUrl;
+      }
+
       // Remove any existing token query parameters since we use Bearer auth
       String normalizedUrl = _removeTokenFromUrl(url);
       if (kDebugMode) {
@@ -128,6 +143,17 @@ class UrlUtils {
       // Extract filename and use correct API endpoint
       String fileName = getFileNameFromUrl(url.replaceAll('\\', '/'));
       normalizedUrl = '$baseUrl/api/files/download/$fileName';
+    }
+    // Handle /api/files/{id} pattern without base URL
+    else if (url.startsWith('/api/files/') &&
+        RegExp(r'/api/files/(\d+)$').hasMatch(url)) {
+      final fileIdPattern = RegExp(r'/api/files/(\d+)$');
+      final match = fileIdPattern.firstMatch(url);
+      if (match != null) {
+        final fileId = match.group(1);
+        // Convert to download endpoint format
+        normalizedUrl = '$baseUrl/api/files/download/$fileId.mp4';
+      }
     }
     // Handle bare filenames (likely from server responses)
     else if (!url.contains('/') &&

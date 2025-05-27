@@ -51,4 +51,26 @@ class ChatRoom {
       'participantIds': participantIds,
     };
   }
+
+  // Helper method to get display name for private chats
+  String getDisplayName(
+    int currentUserId,
+    String Function(int userId)? getUserName,
+  ) {
+    if (!isPrivate) {
+      // For group chats, return the room name
+      return name ?? 'Group Chat';
+    } else {
+      // For private chats, show the other participant's name
+      if (getUserName != null && participantIds.length >= 2) {
+        final otherUserId = participantIds.firstWhere(
+          (id) => id != currentUserId,
+          orElse: () => participantIds.first,
+        );
+        return getUserName(otherUserId);
+      }
+      // Fallback to room name or default
+      return name ?? 'Private Chat';
+    }
+  }
 }

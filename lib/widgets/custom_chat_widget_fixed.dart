@@ -755,6 +755,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                   height: 180,
                   isCurrentUser: isCurrentUser,
                   primaryColor: _primaryColor,
+                  context: context,
                 );
               },
               errorBuilder: (context, error, stackTrace) {

@@ -174,7 +174,7 @@ class ErrorHandler {
 
     if (error.contains('File size exceeds') ||
         error.contains('file too large')) {
-      return 'File is too large. Please select a file under 10MB.';
+      return 'File is too large. Please select a file under 1GB.';
     }
 
     return 'File upload failed. Please try again with a different file.';

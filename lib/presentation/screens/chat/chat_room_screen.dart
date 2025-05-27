@@ -143,7 +143,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       chatRoomId: widget.chatRoomId,
                       currentUserId: _currentUserId!,
                     )
-                    : Center(child: ShimmerWidgets.authLoadingShimmer()),
+                    : Center(
+                      child: ShimmerWidgets.authLoadingShimmer(
+                        context: context,
+                      ),
+                    ),
           ),
 
           // Professional attachment menu

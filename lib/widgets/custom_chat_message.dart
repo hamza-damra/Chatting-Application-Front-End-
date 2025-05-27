@@ -18,9 +18,18 @@ class CustomChatMessage extends StatelessWidget {
     // Check if this is a message from the current user
     final isCurrentUser = message.author.id == currentUserId;
 
-    // Use blue for current user's messages and gray for others
-    final backgroundColor = isCurrentUser ? Colors.blue : Colors.grey.shade200;
-    final textColor = isCurrentUser ? Colors.white : Colors.black87;
+    // Use theme colors for better consistency
+    final theme = Theme.of(context);
+    final backgroundColor =
+        isCurrentUser
+            ? theme.colorScheme.primary
+            : (theme.brightness == Brightness.dark
+                ? theme.colorScheme.surfaceContainerHigh
+                : theme.colorScheme.surfaceContainerLowest);
+    final textColor =
+        isCurrentUser
+            ? theme.colorScheme.onPrimary
+            : theme.colorScheme.onSurface;
 
     // Create a custom message bubble with the appropriate colors
     return Container(

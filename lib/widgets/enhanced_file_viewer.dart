@@ -118,6 +118,7 @@ class _EnhancedFileViewerState extends State<EnhancedFileViewer> {
                 width: 200,
                 height: 200,
                 borderRadius: BorderRadius.circular(8),
+                context: context,
               );
             },
             errorBuilder: (context, error, stackTrace) {

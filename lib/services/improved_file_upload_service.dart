@@ -23,7 +23,7 @@ class ImprovedFileUploadService {
 
   // Constants for file upload
   static const int chunkSize = 64 * 1024; // 64KB chunks as recommended
-  static const int maxFileSize = 10 * 1024 * 1024; // 10MB max file size
+  static const int maxFileSize = 1024 * 1024 * 1024; // 1GB max file size
 
   // File type categories
   static const Map<String, List<String>> supportedFileTypes = {
@@ -56,7 +56,7 @@ class ImprovedFileUploadService {
     // Validate file size
     final fileSize = await File(image.path).length();
     if (fileSize > maxFileSize) {
-      throw Exception('File size exceeds limit of 10MB');
+      throw Exception('File size exceeds limit of 1GB');
     }
 
     // Extract extension and normalize it
@@ -104,7 +104,7 @@ class ImprovedFileUploadService {
     // Validate file size
     final fileSize = await File(image.path).length();
     if (fileSize > maxFileSize) {
-      throw Exception('File size exceeds limit of 10MB');
+      throw Exception('File size exceeds limit of 1GB');
     }
 
     // Extract extension and normalize it
@@ -141,7 +141,7 @@ class ImprovedFileUploadService {
     // Validate file size
     final fileSize = await File(video.path).length();
     if (fileSize > maxFileSize) {
-      throw Exception('File size exceeds limit of 10MB');
+      throw Exception('File size exceeds limit of 1GB');
     }
 
     return _uploadFileWithWebSocket(
@@ -174,7 +174,7 @@ class ImprovedFileUploadService {
     // Validate file size
     final fileSize = await file.length();
     if (fileSize > maxFileSize) {
-      throw Exception('File size exceeds limit of 10MB');
+      throw Exception('File size exceeds limit of 1GB');
     }
 
     return _uploadFileWithWebSocket(
@@ -209,7 +209,7 @@ class ImprovedFileUploadService {
     // Validate file size
     final fileSize = await file.length();
     if (fileSize > maxFileSize) {
-      throw Exception('File size exceeds limit of 10MB');
+      throw Exception('File size exceeds limit of 1GB');
     }
 
     final extension =
@@ -263,7 +263,7 @@ class ImprovedFileUploadService {
     // Validate file size
     final fileSize = await file.length();
     if (fileSize > maxFileSize) {
-      throw Exception('File size exceeds limit of 10MB');
+      throw Exception('File size exceeds limit of 1GB');
     }
 
     // Get file extension and determine proper MIME type

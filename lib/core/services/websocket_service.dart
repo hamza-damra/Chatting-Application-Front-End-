@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import '../config/api_config.dart';
-import 'package:chatting_application/core/services/token_service.dart';
+import 'package:vector/core/services/token_service.dart';
 import '../../domain/models/message_model.dart';
 import '../../domain/models/message_status_model.dart';
 import '../../utils/logger.dart';

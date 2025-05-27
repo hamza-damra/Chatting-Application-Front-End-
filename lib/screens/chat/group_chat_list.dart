@@ -1,8 +1,8 @@
-import 'package:chatting_application/models/chat_room.dart';
-import 'package:chatting_application/providers/chat_provider.dart';
-import 'package:chatting_application/providers/api_auth_provider.dart';
-import 'package:chatting_application/services/improved_file_upload_service.dart';
-import 'package:chatting_application/screens/chat/chat_screen.dart';
+import 'package:vector/models/chat_room.dart';
+import 'package:vector/providers/chat_provider.dart';
+import 'package:vector/providers/api_auth_provider.dart';
+import 'package:vector/services/improved_file_upload_service.dart';
+import 'package:vector/screens/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/shimmer_widgets.dart';
@@ -136,12 +136,19 @@ class _GroupChatListState extends State<GroupChatList>
     }
   }
 
+  // Public method to refresh the list from parent widget
+  void refreshList() {
+    _loadGroupChats();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return ListView.builder(
         itemCount: 8, // Show 8 shimmer items
-        itemBuilder: (context, index) => ShimmerWidgets.listItemShimmer(),
+        itemBuilder:
+            (context, index) =>
+                ShimmerWidgets.listItemShimmer(context: context),
       );
     }
 
@@ -294,7 +301,13 @@ class _GroupChatListState extends State<GroupChatList>
                       CircleAvatar(
                         backgroundColor: Theme.of(context).primaryColor,
                         child: Text(
-                          room.name?.substring(0, 1).toUpperCase() ?? 'G',
+                          room
+                              .getDisplayName(
+                                widget.currentUserId,
+                                widget.chatProvider.getUserNameById,
+                              )
+                              .substring(0, 1)
+                              .toUpperCase(),
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
@@ -304,7 +317,10 @@ class _GroupChatListState extends State<GroupChatList>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              room.name ?? 'Group Chat',
+                              room.getDisplayName(
+                                widget.currentUserId,
+                                widget.chatProvider.getUserNameById,
+                              ),
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
@@ -365,7 +381,9 @@ class _GroupChatListState extends State<GroupChatList>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Are you sure you want to leave "${room.name}"?'),
+                Text(
+                  'Are you sure you want to leave "${room.getDisplayName(widget.currentUserId, widget.chatProvider.getUserNameById)}"?',
+                ),
                 const SizedBox(height: 8),
                 const Text(
                   'You will no longer receive messages from this group and cannot rejoin unless added by another member.',
@@ -417,7 +435,9 @@ class _GroupChatListState extends State<GroupChatList>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Left "${room.name}" successfully'),
+              content: Text(
+                'Left "${room.getDisplayName(widget.currentUserId, widget.chatProvider.getUserNameById)}" successfully',
+              ),
               backgroundColor: Colors.green,
               action: SnackBarAction(label: 'OK', onPressed: () {}),
             ),

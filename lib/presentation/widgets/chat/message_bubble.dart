@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../domain/models/message_model.dart';
-import '../../../core/constants/app_theme.dart';
 import '../../../widgets/video_player_widget.dart';
 import '../../../widgets/chat_image_thumbnail.dart';
 import '../../../utils/url_utils.dart';
@@ -18,94 +17,130 @@ class MessageBubble extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    // Enhanced color scheme for better visual hierarchy
+    // Enhanced color scheme for better visual hierarchy and modern design
     final backgroundColor =
         isMe
             ? theme.colorScheme.primary
             : (isDark
-                ? theme.colorScheme.surfaceContainerHighest
-                : const Color(0xFFF1F3F4));
+                ? theme.colorScheme.surfaceContainerHigh
+                : theme.colorScheme.surfaceContainerLowest);
 
     final textColor =
         isMe ? theme.colorScheme.onPrimary : theme.colorScheme.onSurface;
 
     final timestampColor =
         isMe
-            ? theme.colorScheme.onPrimary.withAlpha(179) // 70% opacity
+            ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
             : theme.colorScheme.onSurfaceVariant;
 
     final senderNameColor =
         isDark
-            ? theme.colorScheme.primary
-            : theme.colorScheme.primary.withAlpha(204); // 80% opacity
+            ? theme.colorScheme.primary.withValues(alpha: 0.9)
+            : theme.colorScheme.primary.withValues(alpha: 0.8);
+
+    // Modern gradient effect for sent messages
+    final gradient =
+        isMe
+            ? LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                theme.colorScheme.primary,
+                theme.colorScheme.primary.withValues(alpha: 0.9),
+              ],
+            )
+            : null;
 
     return Align(
       alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         margin: EdgeInsets.only(
-          top: 2,
-          bottom: 2,
-          left: isMe ? 48 : 0,
-          right: isMe ? 0 : 48,
+          top: 3,
+          bottom: 3,
+          left: isMe ? 64 : 12,
+          right: isMe ? 12 : 64,
         ),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxWidth: MediaQuery.of(context).size.width * 0.78,
+          minWidth: 80,
         ),
         decoration: BoxDecoration(
-          color: backgroundColor,
+          color: gradient == null ? backgroundColor : null,
+          gradient: gradient,
           borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(20),
-            topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isMe ? 20 : 4),
-            bottomRight: Radius.circular(isMe ? 4 : 20),
+            topLeft: const Radius.circular(24),
+            topRight: const Radius.circular(24),
+            bottomLeft: Radius.circular(isMe ? 24 : 6),
+            bottomRight: Radius.circular(isMe ? 6 : 24),
+          ),
+          border: Border.all(
+            color:
+                isMe
+                    ? theme.colorScheme.primary.withValues(alpha: 0.3)
+                    : (isDark
+                        ? theme.colorScheme.outline.withValues(alpha: 0.4)
+                        : theme.colorScheme.outline.withValues(alpha: 0.2)),
+            width: 0.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(
-                isDark ? 51 : 26,
-              ), // 0.2 : 0.1 opacity
-              blurRadius: 4,
-              offset: const Offset(0, 1),
+              color: theme.colorScheme.shadow.withValues(
+                alpha: isDark ? 0.3 : 0.1,
+              ),
+              blurRadius: isDark ? 8 : 4,
+              offset: Offset(0, isDark ? 2 : 1),
+              spreadRadius: 0,
             ),
           ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (!isMe)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: Text(
-                    message.sender.fullName,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: senderNameColor,
-                      fontSize: 12,
+        child: ClipRRect(
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(24),
+            topRight: const Radius.circular(24),
+            bottomLeft: Radius.circular(isMe ? 24 : 6),
+            bottomRight: Radius.circular(isMe ? 6 : 24),
+          ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      message.sender.fullName,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: senderNameColor,
+                        fontSize: 12,
+                        letterSpacing: 0.2,
+                      ),
                     ),
                   ),
-                ),
-              _buildMessageContent(context, textColor),
-              const SizedBox(height: 6),
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    DateFormat('HH:mm').format(message.sentAt),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      color: timestampColor,
-                      fontWeight: FontWeight.w500,
+                _buildMessageContent(context, textColor),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      DateFormat('HH:mm').format(message.sentAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontSize: 11,
+                        color: timestampColor,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.1,
+                      ),
                     ),
-                  ),
-                  if (isMe) ...[
-                    const SizedBox(width: 6),
-                    _buildStatusIcon(timestampColor),
+                    if (isMe) ...[
+                      const SizedBox(width: 8),
+                      _buildStatusIcon(context, timestampColor),
+                    ],
                   ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -126,8 +161,12 @@ class MessageBubble extends StatelessWidget {
           message.content,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: textColor,
-            height: 1.4,
+            height: 1.5,
+            fontSize: 15,
+            fontWeight: FontWeight.w400,
+            letterSpacing: 0.1,
           ),
+          textAlign: TextAlign.left,
         );
       case MessageContentType.image:
         // Get the proper image URL - could be from content or metadata
@@ -170,22 +209,24 @@ class MessageBubble extends StatelessWidget {
           return Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.grey[200], // Use neutral color instead of red
-              borderRadius: BorderRadius.circular(8),
+              color: theme.colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
                 Icon(
                   Icons.error_outline,
-                  color: Colors.grey[700],
-                ), // Use neutral color
+                  color: theme.colorScheme.onErrorContainer,
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'Image URL not found',
-                    style: TextStyle(
-                      color: Colors.grey[800],
-                    ), // Use neutral color
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onErrorContainer,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -232,25 +273,39 @@ class MessageBubble extends StatelessWidget {
       case MessageContentType.file:
         return Row(
           children: [
-            const Icon(Icons.insert_drive_file, size: 40),
-            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: textColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.insert_drive_file,
+                size: 24,
+                color: textColor.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     message.metadata?['name'] ?? 'File',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color:
-                          isMe
-                              ? AppTheme.sentMessageTextColor
-                              : AppTheme.receivedMessageTextColor,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: textColor,
+                      fontSize: 14,
                     ),
                   ),
+                  const SizedBox(height: 2),
                   Text(
                     _formatFileSize(message.metadata?['size'] ?? 0),
-                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontSize: 12,
+                      color: textColor.withValues(alpha: 0.6),
+                      fontWeight: FontWeight.w400,
+                    ),
                   ),
                 ],
               ),
@@ -287,10 +342,13 @@ class MessageBubble extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            VideoThumbnail(
-              videoUrl: videoUrl,
-              heroTag: 'video-${message.id}',
-              isCurrentUser: isMe,
+            SizedBox(
+              width: 240,
+              child: VideoThumbnail(
+                videoUrl: videoUrl,
+                heroTag: 'video-${message.id}',
+                isCurrentUser: isMe,
+              ),
             ),
             if (message.metadata?['caption'] != null)
               Padding(
@@ -306,41 +364,70 @@ class MessageBubble extends StatelessWidget {
           ],
         );
       default:
-        return Text(
-          'Unsupported message type',
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: textColor.withAlpha(179), // 70% opacity
-            fontStyle: FontStyle.italic,
-            height: 1.4,
+        return Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: textColor.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: textColor.withValues(alpha: 0.15),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.help_outline,
+                size: 18,
+                color: textColor.withValues(alpha: 0.6),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Unsupported message type',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: textColor.withValues(alpha: 0.7),
+                    fontStyle: FontStyle.italic,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ),
+            ],
           ),
         );
     }
   }
 
-  Widget _buildStatusIcon(Color color) {
+  Widget _buildStatusIcon(BuildContext context, Color color) {
+    final theme = Theme.of(context);
+
     switch (message.status) {
       case MessageStatus.sending:
         return Icon(
-          Icons.access_time,
-          size: 12,
-          color: color.withAlpha(153),
-        ); // 60% opacity
+          Icons.schedule,
+          size: 14,
+          color: color.withValues(alpha: 0.6),
+        );
       case MessageStatus.sent:
-        return Icon(
-          Icons.check,
-          size: 12,
-          color: color.withAlpha(179),
-        ); // 70% opacity
+        return Icon(Icons.check, size: 14, color: color.withValues(alpha: 0.7));
       case MessageStatus.delivered:
         return Icon(
           Icons.done_all,
-          size: 12,
-          color: color.withAlpha(179),
-        ); // 70% opacity
+          size: 14,
+          color: color.withValues(alpha: 0.7),
+        );
       case MessageStatus.read:
-        return Icon(Icons.done_all, size: 12, color: Colors.blue.shade400);
+        return Icon(
+          Icons.done_all,
+          size: 14,
+          color: theme.colorScheme.tertiary,
+        );
       case MessageStatus.failed:
-        return const Icon(Icons.error_outline, size: 12, color: Colors.red);
+        return Icon(
+          Icons.error_outline,
+          size: 14,
+          color: theme.colorScheme.error,
+        );
     }
   }
 

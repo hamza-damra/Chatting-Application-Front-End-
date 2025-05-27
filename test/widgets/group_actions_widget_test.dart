@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:chatting_application/widgets/group_actions_widget.dart';
-import 'package:chatting_application/models/chat_room.dart';
+import 'package:vector/widgets/group_actions_widget.dart';
+import 'package:vector/models/chat_room.dart';
 
 void main() {
   group('GroupActionsWidget', () {

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 
 // Import existing providers for backward compatibility
 import 'core/services/token_service.dart';
@@ -16,9 +17,12 @@ import 'providers/chat_provider.dart';
 import 'providers/user_status_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/notification_provider.dart';
+import 'providers/message_pagination_provider.dart';
+import 'services/message_pagination_service.dart';
 import 'services/notification_service.dart';
 import 'services/navigation_service.dart';
 import 'services/background_notification_manager.dart';
+import 'services/screen_state_manager.dart';
 
 import 'services/connectivity_service.dart';
 import 'utils/url_utils.dart';
@@ -214,6 +218,21 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                   webSocketService: webSocketService,
                 ),
           ),
+          // Provide message pagination service
+          Provider<MessagePaginationService>(
+            create:
+                (context) => MessagePaginationService(
+                  serviceLocator<Dio>(),
+                  widget.tokenService,
+                ),
+          ),
+          // Provide message pagination provider
+          ChangeNotifierProvider<MessagePaginationProvider>(
+            create:
+                (context) => MessagePaginationProvider(
+                  Provider.of<MessagePaginationService>(context, listen: false),
+                ),
+          ),
         ],
         child: Consumer<ThemeProvider>(
           builder:
@@ -290,12 +309,16 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
 
   void _handleAppPaused() {
     // App went to background
+    // Clear screen state to allow notifications
+    ScreenStateManager.instance.clearCurrentScreen();
     // Ensure background services are running
     _ensureBackgroundServicesRunning();
   }
 
   void _handleAppDetached() {
     // App is being terminated
+    // Clear screen state to allow notifications
+    ScreenStateManager.instance.clearCurrentScreen();
     // Background services should continue running
   }
 
@@ -324,23 +347,48 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
     return BlocBuilder<AuthBloc, AuthState>(
       builder: (context, state) {
         // For backward compatibility, also check the old auth provider
-        final authProvider = Provider.of<ApiAuthProvider>(context);
+        // Use Selector to only listen to authentication status changes, not user data changes
+        return Selector<ApiAuthProvider, bool>(
+          selector: (context, authProvider) => authProvider.isAuthenticated,
+          builder: (context, isAuthenticated, child) {
+            final authProvider = Provider.of<ApiAuthProvider>(
+              context,
+              listen: false,
+            );
 
-        // Show loading indicator while checking authentication state
-        if (state is AuthLoading || authProvider.isLoading) {
-          return Scaffold(
-            body: Center(child: ShimmerWidgets.authLoadingShimmer()),
-          );
-        }
+            AppLogger.d(
+              'AuthWrapper',
+              'Auth state check - BlocState: ${state.runtimeType}, isAuthenticated: $isAuthenticated',
+            );
 
-        // Navigate to home screen if authenticated, otherwise show login screen
-        if (state is AuthAuthenticated || authProvider.isAuthenticated) {
-          // Initialize background services for authenticated user
-          _initializeBackgroundServicesForUser(authProvider);
-          return const HomeScreen();
-        }
+            // Show loading indicator while checking authentication state
+            if (state is AuthLoading || authProvider.isLoading) {
+              AppLogger.d('AuthWrapper', 'Showing loading screen');
+              return Scaffold(
+                body: Center(
+                  child: ShimmerWidgets.authLoadingShimmer(context: context),
+                ),
+              );
+            }
 
-        return const LoginScreen();
+            // Navigate to home screen if authenticated, otherwise show login screen
+            if (state is AuthAuthenticated || isAuthenticated) {
+              AppLogger.d(
+                'AuthWrapper',
+                'User authenticated, showing home screen',
+              );
+              // Initialize background services for authenticated user
+              _initializeBackgroundServicesForUser(authProvider);
+              return const HomeScreen();
+            }
+
+            AppLogger.d(
+              'AuthWrapper',
+              'User not authenticated, showing login screen',
+            );
+            return const LoginScreen();
+          },
+        );
       },
     );
   }
@@ -352,11 +400,30 @@ class _AuthWrapperState extends State<AuthWrapper> with WidgetsBindingObserver {
       final token = tokenService.accessToken ?? '';
 
       // Initialize background notification manager with user credentials
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        BackgroundNotificationManager.instance.updateUserAuth(
-          userId: authProvider.user!.id.toString(),
-          authToken: token,
-        );
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        try {
+          AppLogger.i(
+            'AuthWrapper',
+            'Initializing global push notifications for user: ${authProvider.user!.id}',
+          );
+
+          // Update background notification manager with user credentials
+          // This will automatically initialize SpringBootPushManager and background services
+          await BackgroundNotificationManager.instance.updateUserAuth(
+            userId: authProvider.user!.id.toString(),
+            authToken: token,
+          );
+
+          AppLogger.i(
+            'AuthWrapper',
+            'Global push notifications initialized successfully via BackgroundNotificationManager',
+          );
+        } catch (e) {
+          AppLogger.e(
+            'AuthWrapper',
+            'Error initializing global push notifications: $e',
+          );
+        }
       });
     }
   }

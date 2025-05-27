@@ -4,7 +4,6 @@ import '../models/chat_room.dart';
 import '../providers/chat_provider.dart';
 import '../widgets/blocked_user_indicator.dart';
 import 'package:intl/intl.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 class ModernChatListItem extends StatelessWidget {
   final ChatRoom chatRoom;
@@ -39,41 +38,33 @@ class ModernChatListItem extends StatelessWidget {
         final roomIdString = chatRoom.id.toString();
         final unreadCount = chatProvider.getUnreadCount(roomIdString);
 
+        // Get display name using the new method
+        final displayName = chatRoom.getDisplayName(
+          currentUserId,
+          chatProvider.getUserNameById,
+        );
+
         final chatListWidget = Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: theme.shadowColor.withValues(alpha: 0.12),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-                spreadRadius: 0,
-              ),
-              BoxShadow(
-                color: theme.shadowColor.withValues(alpha: 0.06),
-                blurRadius: 6,
-                offset: const Offset(0, 2),
-                spreadRadius: 0,
-              ),
-            ],
+            color: theme.colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.08),
-              width: 0.5,
+              color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              width: 1,
             ),
           ),
           child: Material(
             color: Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: onTap,
               onLongPress: onLongPress,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(12),
               splashColor: theme.colorScheme.primary.withValues(alpha: 0.1),
               highlightColor: theme.colorScheme.primary.withValues(alpha: 0.05),
               child: Padding(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
                     // Professional Avatar
@@ -82,7 +73,7 @@ class ModernChatListItem extends StatelessWidget {
                       isGroup: isGroup,
                       theme: theme,
                     ),
-                    const SizedBox(width: 18),
+                    const SizedBox(width: 16),
 
                     // Chat info
                     Expanded(
@@ -95,8 +86,7 @@ class ModernChatListItem extends StatelessWidget {
                               // Chat name
                               Expanded(
                                 child: Text(
-                                  chatRoom.name ??
-                                      (isGroup ? 'Group Chat' : 'Private Chat'),
+                                  displayName,
                                   style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.w600,
                                     fontSize: 17,
@@ -174,32 +164,15 @@ class ModernChatListItem extends StatelessWidget {
                                     vertical: 4,
                                   ),
                                   decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        theme.colorScheme.primary,
-                                        theme.colorScheme.primary.withValues(
-                                          alpha: 0.8,
-                                        ),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
+                                    color: theme.colorScheme.primary,
                                     borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: theme.colorScheme.primary
-                                            .withValues(alpha: 0.3),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 2),
-                                      ),
-                                    ],
                                   ),
                                   child: Text(
                                     unreadCount > 99
                                         ? '99+'
                                         : unreadCount.toString(),
                                     style: theme.textTheme.labelSmall?.copyWith(
-                                      color: Colors.white,
+                                      color: theme.colorScheme.onPrimary,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -236,53 +209,18 @@ class ModernChatListItem extends StatelessWidget {
     required bool isGroup,
     required ThemeData theme,
   }) {
-    final displayName = chatRoom.name ?? (isGroup ? 'G' : 'U');
-
     return Container(
-      width: 64,
-      height: 64,
+      width: 48,
+      height: 48,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient:
-            isGroup
-                ? LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.secondary,
-                    theme.colorScheme.tertiary,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  stops: const [0.0, 0.6, 1.0],
-                )
-                : LinearGradient(
-                  colors: [
-                    theme.colorScheme.primaryContainer,
-                    theme.colorScheme.primaryContainer.withValues(alpha: 0.8),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.primary.withValues(alpha: 0.2),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: ClipOval(
-        child: Center(
-          child: Text(
-            displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-            style: TextStyle(
-              color:
-                  isGroup ? Colors.white : theme.colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w600,
-              fontSize: 22,
-              letterSpacing: 0.5,
-            ),
-          ),
+      child: Center(
+        child: Icon(
+          isGroup ? Icons.group_rounded : Icons.person_rounded,
+          size: 20,
+          color: theme.colorScheme.primary,
         ),
       ),
     );

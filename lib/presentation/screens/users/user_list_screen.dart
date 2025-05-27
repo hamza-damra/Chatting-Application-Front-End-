@@ -6,6 +6,7 @@ import '../../../core/constants/app_theme.dart';
 import '../../../presentation/blocs/chat/chat_bloc.dart';
 import '../../../presentation/blocs/chat/chat_event.dart';
 import '../../../widgets/shimmer_widgets.dart';
+import '../../../widgets/profile_image_widget.dart';
 
 class UserListScreen extends StatefulWidget {
   const UserListScreen({super.key});
@@ -125,37 +126,14 @@ class _UserListScreenState extends State<UserListScreen> {
                       final user = state.users[index];
 
                       return ListTile(
-                        leading: CircleAvatar(
-                          backgroundColor: Colors.grey[300],
-                          backgroundImage:
-                              user.profilePicture != null &&
-                                      user.profilePicture!.isNotEmpty
-                                  ? NetworkImage(user.profilePicture!)
-                                  : null,
-                          child:
-                              user.profilePicture == null ||
-                                      user.profilePicture!.isEmpty
-                                  ? Text(
-                                    user.fullName.isNotEmpty
-                                        ? user.fullName[0].toUpperCase()
-                                        : '?',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  )
-                                  : null,
+                        leading: ChatProfileImageWidget(
+                          userId: user.id,
+                          userName: user.fullName,
+                          size: 40,
+                          isOnline: user.isOnline,
                         ),
                         title: Text(user.fullName),
                         subtitle: Text(user.username),
-                        trailing: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: user.isOnline ? Colors.green : Colors.grey,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
                         onTap: () => _startChat(user),
                       );
                     },

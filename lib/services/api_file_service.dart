@@ -47,9 +47,9 @@ class ApiFileService {
         );
       }
 
-      // Validate file size (10MB limit)
-      if (fileSize > 10 * 1024 * 1024) {
-        throw Exception('File size exceeds 10MB limit');
+      // Validate file size (1GB limit)
+      if (fileSize > 1024 * 1024 * 1024) {
+        throw Exception('File size exceeds 1GB limit');
       }
 
       // Create multipart request to the exact backend endpoint

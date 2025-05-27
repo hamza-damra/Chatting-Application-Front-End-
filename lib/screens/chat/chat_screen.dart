@@ -1,11 +1,10 @@
 import 'dart:async';
-import 'package:chatting_application/models/chat_room.dart';
-import 'package:chatting_application/models/message.dart';
-import 'package:chatting_application/providers/api_auth_provider.dart';
-import 'package:chatting_application/providers/chat_provider.dart';
-import 'package:chatting_application/services/improved_file_upload_service.dart';
-import 'package:chatting_application/services/websocket_service.dart' as ws;
-import 'package:chatting_application/screens/chat/group_settings_screen.dart';
+import 'package:vector/models/chat_room.dart';
+import 'package:vector/providers/api_auth_provider.dart';
+import 'package:vector/providers/chat_provider.dart';
+import 'package:vector/services/improved_file_upload_service.dart';
+import 'package:vector/services/websocket_service.dart' as ws;
+import 'package:vector/screens/chat/group_settings_screen.dart';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,6 +12,7 @@ import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 
 import '../../widgets/custom_chat_widget_new.dart';
 import '../../widgets/block_user_button.dart';
+import '../../services/screen_state_manager.dart';
 import '../../utils/logger.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -86,6 +86,12 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
       // Mark user as active in this room
       _webSocketService.enterRoom(_roomId);
+
+      // Update screen state to indicate user is in this chat room
+      ScreenStateManager.instance.updateCurrentScreen(
+        ScreenStateManager.chatRoomScreen,
+        chatRoomId: _roomIdString,
+      );
     });
   }
 
@@ -99,6 +105,11 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
     // Unsubscribe from room messages when leaving the chat screen
     _chatProvider.unsubscribeFromRoom(_roomIdString);
+
+    // Clear screen state when leaving chat room
+    ScreenStateManager.instance.updateCurrentScreen(
+      ScreenStateManager.otherScreen,
+    );
 
     // Remove lifecycle observer
     WidgetsBinding.instance.removeObserver(this);
@@ -117,13 +128,18 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     switch (state) {
       case AppLifecycleState.paused:
       case AppLifecycleState.detached:
-        // App is backgrounded, leave room
+        // App is backgrounded, leave room and clear screen state
         _webSocketService.leaveRoom(_roomId);
+        ScreenStateManager.instance.clearCurrentScreen();
         AppLogger.i('ChatScreen', 'App backgrounded, left room $_roomId');
         break;
       case AppLifecycleState.resumed:
-        // App is foregrounded, re-enter room
+        // App is foregrounded, re-enter room and restore screen state
         _webSocketService.enterRoom(_roomId);
+        ScreenStateManager.instance.updateCurrentScreen(
+          ScreenStateManager.chatRoomScreen,
+          chatRoomId: _roomIdString,
+        );
         AppLogger.i('ChatScreen', 'App resumed, entered room $_roomId');
         break;
       default:
@@ -249,51 +265,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.red));
-  }
-
-  // Convert types.Message to Message for the CustomChatWidgetNew
-  Message _convertTypesMessageToMessage(types.Message typesMsg) {
-    String? attachmentUrl;
-    String? contentType;
-    String? content = typesMsg.id; // Default content
-
-    if (typesMsg is types.TextMessage) {
-      content = typesMsg.text;
-      contentType = 'text/plain';
-    } else if (typesMsg is types.ImageMessage) {
-      attachmentUrl = typesMsg.uri;
-      contentType = 'image/jpeg';
-      content = typesMsg.name;
-    } else if (typesMsg is types.FileMessage) {
-      // Handle file messages (including text files)
-      content = typesMsg.uri; // Use the file URL as content
-      attachmentUrl = typesMsg.uri;
-      contentType = typesMsg.mimeType ?? 'application/octet-stream';
-      // For text files, we want the URL in the content field for detection
-    } else if (typesMsg is types.CustomMessage) {
-      // Handle custom messages (videos, files, etc.)
-      final metadata = typesMsg.metadata;
-      if (metadata != null) {
-        attachmentUrl = metadata['attachmentUrl'] as String?;
-        contentType = metadata['contentType'] as String?;
-        content = metadata['fileName'] as String? ?? 'File';
-      }
-    }
-
-    return Message(
-      id: int.tryParse(typesMsg.id) ?? 0,
-      senderId: int.tryParse(typesMsg.author.id) ?? 0,
-      senderName:
-          '${typesMsg.author.firstName ?? ''} ${typesMsg.author.lastName ?? ''}'
-              .trim(),
-      content: content,
-      contentType: contentType,
-      attachmentUrl: attachmentUrl,
-      sentAt:
-          typesMsg.createdAt != null
-              ? DateTime.fromMillisecondsSinceEpoch(typesMsg.createdAt!)
-              : DateTime.now(),
-    );
   }
 
   void _handleGroupLeft() {
@@ -538,29 +509,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
     }
 
-    // Use ChatProvider's messages instead of local _messages
-    return Consumer<ChatProvider>(
-      builder: (context, chatProvider, child) {
-        final providerMessages = chatProvider.getMessages(_roomIdString);
-
-        // Convert types.Message to Message for the widget
-        final convertedMessages =
-            providerMessages.map((typesMsg) {
-              return _convertTypesMessageToMessage(typesMsg);
-            }).toList();
-
-        return CustomChatWidgetNew(
-          messages: convertedMessages,
-          onSendMessage: (message) => _sendTextMessage(message),
-          onSendAttachment:
-              (url, contentType) => _sendFileMessage(url, contentType),
-          currentUserId: _currentUserId,
-          webSocketService: _uploadService,
-          roomId: widget.chatRoom.id,
-          otherUserId: _otherUserId,
-          otherUserName: _otherUserName,
-        );
-      },
+    // Use the new pagination-enabled chat widget
+    return CustomChatWidgetNew(
+      onSendMessage: (message) => _sendTextMessage(message),
+      onSendAttachment:
+          (url, contentType) => _sendFileMessage(url, contentType),
+      currentUserId: _currentUserId,
+      webSocketService: _uploadService,
+      roomId: widget.chatRoom.id,
+      otherUserId: _otherUserId,
+      otherUserName: _otherUserName,
+      pageSize: 20, // Configure page size for pagination
     );
   }
 }

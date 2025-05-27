@@ -212,9 +212,9 @@ class FileUploadService {
 
       // Check file size
       final fileSize = await file.length();
-      if (fileSize > 10 * 1024 * 1024) {
-        // 10MB limit
-        throw Exception('File size exceeds the maximum allowed (10MB)');
+      if (fileSize > 1024 * 1024 * 1024) {
+        // 1GB limit
+        throw Exception('File size exceeds the maximum allowed (1GB)');
       }
 
       // Start upload

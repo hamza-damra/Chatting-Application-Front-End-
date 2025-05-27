@@ -43,7 +43,7 @@ class CustomButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(borderRadius),
                   ),
                 ),
-                child: _buildButtonContent(theme),
+                child: _buildButtonContent(context, theme),
               )
               : ElevatedButton(
                 onPressed: isLoading ? null : onPressed,
@@ -54,16 +54,17 @@ class CustomButton extends StatelessWidget {
                     borderRadius: BorderRadius.circular(borderRadius),
                   ),
                 ),
-                child: _buildButtonContent(theme),
+                child: _buildButtonContent(context, theme),
               ),
     );
   }
 
-  Widget _buildButtonContent(ThemeData theme) {
+  Widget _buildButtonContent(BuildContext context, ThemeData theme) {
     return isLoading
         ? ShimmerWidgets.buttonShimmer(
           width: 20,
           height: 20,
+          context: context,
           baseColor:
               isOutlined
                   ? theme.colorScheme.primary.withValues(alpha: 0.3)

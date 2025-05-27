@@ -276,7 +276,9 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
             // Navigate to the chat screen with the newly created room
             safelyUseContext((ctx) {
-              Navigator.of(ctx).pop(); // Close create group screen
+              Navigator.of(
+                ctx,
+              ).pop(true); // Close create group screen with success indicator
               Navigator.of(ctx).push(
                 MaterialPageRoute(
                   builder: (context) => ChatScreen(chatRoom: chatRoom),
@@ -286,7 +288,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           } catch (e) {
             // If navigation fails, just return with success
             safelyUseContext((ctx) {
-              Navigator.of(ctx).pop(true);
+              Navigator.of(ctx).pop(true); // Return success indicator
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(
                   content: Text('Group created successfully!'),

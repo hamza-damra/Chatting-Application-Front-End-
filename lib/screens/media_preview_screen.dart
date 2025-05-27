@@ -86,7 +86,9 @@ class _MediaPreviewScreenState extends State<MediaPreviewScreen> {
       ),
       body:
           _isLoading
-              ? Center(child: ShimmerWidgets.mediaPreviewShimmer())
+              ? Center(
+                child: ShimmerWidgets.mediaPreviewShimmer(context: context),
+              )
               : _errorMessage.isNotEmpty
               ? Center(
                 child: Column(
@@ -119,7 +121,11 @@ class _MediaPreviewScreenState extends State<MediaPreviewScreen> {
           loadingBuilder: (context, child, loadingProgress) {
             if (loadingProgress == null) return child;
             return Center(
-              child: ShimmerWidgets.imageShimmer(width: 200, height: 200),
+              child: ShimmerWidgets.imageShimmer(
+                width: 200,
+                height: 200,
+                context: context,
+              ),
             );
           },
           errorBuilder: (context, error, stackTrace) {

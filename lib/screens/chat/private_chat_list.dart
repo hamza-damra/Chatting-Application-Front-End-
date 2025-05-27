@@ -1,8 +1,8 @@
-import 'package:chatting_application/models/chat_room.dart';
-import 'package:chatting_application/providers/chat_provider.dart';
-import 'package:chatting_application/providers/api_auth_provider.dart';
-import 'package:chatting_application/services/improved_file_upload_service.dart';
-import 'package:chatting_application/screens/chat/chat_screen.dart';
+import 'package:vector/models/chat_room.dart';
+import 'package:vector/providers/chat_provider.dart';
+import 'package:vector/providers/api_auth_provider.dart';
+import 'package:vector/services/improved_file_upload_service.dart';
+import 'package:vector/screens/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../widgets/shimmer_widgets.dart';
@@ -134,12 +134,19 @@ class _PrivateChatListState extends State<PrivateChatList>
     }
   }
 
+  // Public method to refresh the list from parent widget
+  void refreshList() {
+    _loadPrivateChats();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
       return ListView.builder(
         itemCount: 8, // Show 8 shimmer items
-        itemBuilder: (context, index) => ShimmerWidgets.listItemShimmer(),
+        itemBuilder:
+            (context, index) =>
+                ShimmerWidgets.listItemShimmer(context: context),
       );
     }
 
@@ -286,7 +293,13 @@ class _PrivateChatListState extends State<PrivateChatList>
                       CircleAvatar(
                         backgroundColor: Theme.of(context).primaryColor,
                         child: Text(
-                          room.name?.substring(0, 1).toUpperCase() ?? '?',
+                          room
+                              .getDisplayName(
+                                widget.currentUserId,
+                                widget.chatProvider.getUserNameById,
+                              )
+                              .substring(0, 1)
+                              .toUpperCase(),
                           style: const TextStyle(color: Colors.white),
                         ),
                       ),
@@ -296,7 +309,10 @@ class _PrivateChatListState extends State<PrivateChatList>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              room.name ?? 'Private Chat',
+                              room.getDisplayName(
+                                widget.currentUserId,
+                                widget.chatProvider.getUserNameById,
+                              ),
                               style: Theme.of(context).textTheme.titleMedium
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
@@ -365,7 +381,9 @@ class _PrivateChatListState extends State<PrivateChatList>
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Marked "${room.name}" as read'),
+        content: Text(
+          'Marked "${room.getDisplayName(widget.currentUserId, widget.chatProvider.getUserNameById)}" as read',
+        ),
         backgroundColor: Colors.blue,
       ),
     );
@@ -400,7 +418,7 @@ class _PrivateChatListState extends State<PrivateChatList>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Are you sure you want to permanently delete "${room.name}"?',
+                  'Are you sure you want to permanently delete "${room.getDisplayName(widget.currentUserId, widget.chatProvider.getUserNameById)}"?',
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -450,7 +468,9 @@ class _PrivateChatListState extends State<PrivateChatList>
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('User "${room.name}" deleted successfully'),
+              content: Text(
+                'User "${room.getDisplayName(widget.currentUserId, widget.chatProvider.getUserNameById)}" deleted successfully',
+              ),
               backgroundColor: Colors.green,
               action: SnackBarAction(label: 'OK', onPressed: () {}),
             ),

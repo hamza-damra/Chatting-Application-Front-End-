@@ -172,7 +172,7 @@ class ImageViewer extends StatelessWidget {
             );
           },
           loadingBuilder: (context, event) {
-            return ShimmerWidgets.fullScreenImageShimmer();
+            return ShimmerWidgets.fullScreenImageShimmer(context: context);
           },
         );
       },

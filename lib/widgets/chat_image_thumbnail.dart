@@ -84,17 +84,7 @@ class ChatImageThumbnail extends StatelessWidget {
                       width: width,
                       height: height,
                       fit: fit,
-                      placeholder: Container(
-                        color: Colors.grey[300],
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ),
+                      placeholder: _buildModernLoadingPlaceholder(),
                       errorWidget: Container(
                         color: Colors.grey[300],
                         width: width,
@@ -147,17 +137,7 @@ class ChatImageThumbnail extends StatelessWidget {
                       width: width,
                       height: height,
                       placeholder:
-                          (context, url) => Container(
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.grey,
-                                ),
-                              ),
-                            ),
-                          ),
+                          (context, url) => _buildModernLoadingPlaceholder(),
                       errorWidget:
                           (context, url, error) => Container(
                             color: Colors.grey[300],
@@ -207,6 +187,95 @@ class ChatImageThumbnail extends StatelessWidget {
                     ),
           ),
         ),
+      ),
+    );
+  }
+
+  // Build modern loading placeholder with shimmer effect
+  Widget _buildModernLoadingPlaceholder() {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Shimmer effect
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 1500),
+            tween: Tween(begin: 0.0, end: 1.0),
+            builder: (context, value, child) {
+              return Container(
+                width: double.infinity,
+                height: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.grey[300]!,
+                      Colors.grey[200]!,
+                      Colors.grey[100]!,
+                      Colors.grey[200]!,
+                      Colors.grey[300]!,
+                    ],
+                    stops: [
+                      0.0,
+                      0.25 + value * 0.25,
+                      0.5 + value * 0.25,
+                      0.75 + value * 0.25,
+                      1.0,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              );
+            },
+          ),
+
+          // Image icon
+          Icon(Icons.image, size: 48, color: Colors.grey[500]),
+
+          // Loading indicator
+          Positioned(
+            bottom: 12,
+            right: 12,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.black.withAlpha(128),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isCurrentUser ? Colors.white : Colors.blue,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Loading...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

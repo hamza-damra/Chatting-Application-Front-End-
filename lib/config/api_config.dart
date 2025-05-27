@@ -15,6 +15,17 @@ class ApiConfig {
   static const String usersEndpoint = '/api/users';
   static const String userStatusEndpoint = '/api/users/status';
 
+  // Profile image endpoints
+  static const String addProfileImageEndpoint = '/api/users/me/profile-image';
+  static const String updateProfileImageEndpoint =
+      '/api/users/me/profile-image';
+
+  // Profile image GET endpoints (NEW - Direct image access)
+  static const String getCurrentUserProfileImageEndpoint =
+      '/api/users/me/profile-image/view';
+  static const String getUserProfileImageEndpoint =
+      '/api/users/{userId}/profile-image/view';
+
   // Chat room endpoints
   static const String chatRoomsEndpoint = '/api/chatrooms';
 
@@ -74,5 +85,15 @@ class ApiConfig {
 
   static Map<String, String> getContentTypeHeader() {
     return {'Content-Type': 'application/json'};
+  }
+
+  // Profile image URL helpers (NEW)
+  static String getCurrentUserProfileImageUrl() {
+    return baseUrl + getCurrentUserProfileImageEndpoint;
+  }
+
+  static String getUserProfileImageUrl(int userId) {
+    return baseUrl +
+        getUserProfileImageEndpoint.replaceAll('{userId}', userId.toString());
   }
 }

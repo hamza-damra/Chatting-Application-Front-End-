@@ -7,6 +7,7 @@ import 'background_websocket_service.dart';
 import 'spring_boot_push_manager.dart';
 import 'notification_permission_handler.dart';
 import 'enhanced_notification_service.dart';
+import 'screen_state_manager.dart';
 
 /// Manages background notifications and app lifecycle for the chat application
 class BackgroundNotificationManager with WidgetsBindingObserver {
@@ -209,6 +210,8 @@ class BackgroundNotificationManager with WidgetsBindingObserver {
 
   /// Determine if notification should be shown
   bool _shouldShowNotification(Map<String, dynamic> messageData) {
+    final messageRoomId = messageData['chatRoomId']?.toString();
+
     // Always show if app is in background
     if (_isInBackground) {
       AppLogger.i(
@@ -218,8 +221,19 @@ class BackgroundNotificationManager with WidgetsBindingObserver {
       return true;
     }
 
+    // Check if notification should be suppressed based on current screen
+    if (messageRoomId != null) {
+      final screenStateManager = ScreenStateManager.instance;
+      if (screenStateManager.shouldSuppressNotification(messageRoomId)) {
+        AppLogger.i(
+          'BackgroundNotificationManager',
+          'Skipping notification - suppressed by screen state manager (Room: $messageRoomId)',
+        );
+        return false;
+      }
+    }
+
     // Show if user is not in the active room where the message was sent
-    final messageRoomId = messageData['chatRoomId']?.toString();
     if (messageRoomId != null && messageRoomId != _activeRoomId) {
       AppLogger.i(
         'BackgroundNotificationManager',

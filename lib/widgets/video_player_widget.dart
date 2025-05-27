@@ -242,8 +242,8 @@ class _LegacyVideoPlayerState extends State<_LegacyVideoPlayer> {
   }
 }
 
-// A simpler thumbnail version for the chat
-class VideoThumbnail extends StatelessWidget {
+// A simpler thumbnail version for the chat with loading animation
+class VideoThumbnail extends StatefulWidget {
   final String videoUrl;
   final String heroTag;
   final bool isCurrentUser;
@@ -256,27 +256,93 @@ class VideoThumbnail extends StatelessWidget {
   });
 
   @override
+  State<VideoThumbnail> createState() => _VideoThumbnailState();
+}
+
+class _VideoThumbnailState extends State<VideoThumbnail>
+    with TickerProviderStateMixin {
+  bool _isLoading = true;
+  final bool _hasError = false;
+  late AnimationController _shimmerController;
+  late AnimationController _pulseController;
+  late Animation<double> _shimmerAnimation;
+  late Animation<double> _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize shimmer animation for loading state
+    _shimmerController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _shimmerAnimation = Tween<double>(begin: -1.0, end: 1.0).animate(
+      CurvedAnimation(parent: _shimmerController, curve: Curves.easeInOut),
+    );
+
+    // Initialize pulse animation for play button
+    _pulseController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    _startLoadingAnimation();
+    _simulateVideoLoad();
+  }
+
+  void _startLoadingAnimation() {
+    _shimmerController.repeat();
+  }
+
+  void _simulateVideoLoad() {
+    // Simulate video metadata loading (in real app, this would check if video is accessible)
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _shimmerController.stop();
+        _pulseController.repeat(reverse: true);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _shimmerController.dispose();
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) => Scaffold(
-                  appBar: AppBar(title: const Text('Video')),
-                  body: SafeArea(
-                    child: VideoPlayerWidget(
-                      videoUrl: videoUrl,
-                      heroTag: heroTag,
-                    ),
+      onTap:
+          _isLoading
+              ? null
+              : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => Scaffold(
+                          appBar: AppBar(title: const Text('Video')),
+                          body: SafeArea(
+                            child: VideoPlayerWidget(
+                              videoUrl: widget.videoUrl,
+                              heroTag: widget.heroTag,
+                            ),
+                          ),
+                        ),
                   ),
-                ),
-          ),
-        );
-      },
+                );
+              },
       child: Hero(
-        tag: heroTag,
+        tag: widget.heroTag,
         child: Container(
           width: double.infinity,
           height: 180,
@@ -284,37 +350,170 @@ class VideoThumbnail extends StatelessWidget {
             color: Colors.black87,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                color: Colors.grey[800],
-                child: Center(
-                  child: Icon(
-                    Icons.videocam,
-                    size: 64,
-                    color: isCurrentUser ? Colors.white70 : Colors.grey[400],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Background
+                Container(
+                  width: double.infinity,
+                  height: double.infinity,
+                  color: Colors.grey[800],
+                ),
+
+                // Loading shimmer effect
+                if (_isLoading)
+                  AnimatedBuilder(
+                    animation: _shimmerAnimation,
+                    builder: (context, child) {
+                      return Container(
+                        width: double.infinity,
+                        height: double.infinity,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              Colors.grey[800]!,
+                              Colors.grey[700]!,
+                              Colors.grey[600]!,
+                              Colors.grey[700]!,
+                              Colors.grey[800]!,
+                            ],
+                            stops: [
+                              0.0,
+                              0.25 + _shimmerAnimation.value * 0.25,
+                              0.5 + _shimmerAnimation.value * 0.25,
+                              0.75 + _shimmerAnimation.value * 0.25,
+                              1.0,
+                            ],
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
+
+                // Video icon (always visible)
+                Icon(
+                  Icons.videocam,
+                  size: 64,
                   color:
-                      isCurrentUser
-                          ? Theme.of(context).primaryColor.withAlpha(204)
-                          : Colors.black54,
-                  shape: BoxShape.circle,
+                      _isLoading
+                          ? Colors.grey[500]
+                          : (widget.isCurrentUser
+                              ? Colors.white70
+                              : Colors.grey[400]),
                 ),
-                child: const Icon(
-                  Icons.play_arrow,
-                  color: Colors.white,
-                  size: 36,
-                ),
-              ),
-            ],
+
+                // Loading indicator
+                if (_isLoading)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                widget.isCurrentUser
+                                    ? Colors.white
+                                    : Theme.of(context).primaryColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Loading...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // Play button (only when not loading)
+                if (!_isLoading && !_hasError)
+                  AnimatedBuilder(
+                    animation: _pulseAnimation,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color:
+                                widget.isCurrentUser
+                                    ? Theme.of(
+                                      context,
+                                    ).primaryColor.withAlpha(230)
+                                    : Colors.black.withAlpha(180),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(100),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                // Duration badge (placeholder - could be enhanced to show actual duration)
+                if (!_isLoading)
+                  Positioned(
+                    top: 12,
+                    right: 12,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withAlpha(180),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.videocam, size: 12, color: Colors.white),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Video',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),

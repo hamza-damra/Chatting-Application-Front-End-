@@ -46,26 +46,67 @@ class _TypingIndicatorState extends State<TypingIndicator>
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    // Theme-aware colors for modern design
+    final backgroundColor =
+        isDark
+            ? const Color(0xFF2D2D2D) // More visible background in dark mode
+            : theme.colorScheme.surfaceContainerLowest;
+
+    final textColor = theme.colorScheme.onSurfaceVariant;
+    final dotColor = theme.colorScheme.primary.withAlpha(179); // 70% opacity
+
     return Tooltip(
       message:
           widget.userId.isNotEmpty
               ? 'User ID: ${widget.userId}'
               : 'Unknown user',
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
         margin: const EdgeInsets.only(left: 16, right: 16, bottom: 8),
         decoration: BoxDecoration(
-          color: Colors.grey[200],
-          borderRadius: BorderRadius.circular(16),
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color:
+                isDark
+                    ? const Color(
+                      0xFF404040,
+                    ) // More visible border in dark mode
+                    : theme.colorScheme.outline.withAlpha(
+                      77,
+                    ), // 30% opacity in light mode
+            width: 0.8,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color:
+                  isDark
+                      ? Colors.black.withAlpha(51) // 20% opacity for dark mode
+                      : Colors.black.withAlpha(
+                        26,
+                      ), // 10% opacity for light mode
+              blurRadius: isDark ? 6 : 4,
+              offset: const Offset(0, 1),
+              spreadRadius: 0,
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
               '${widget.userName} is typing',
-              style: TextStyle(color: Colors.grey[700], fontSize: 12),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: textColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.1,
+              ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             AnimatedBuilder(
               animation: _controller,
               builder: (context, child) {
@@ -73,14 +114,14 @@ class _TypingIndicatorState extends State<TypingIndicator>
                   children: List.generate(
                     3,
                     (index) => Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 1),
+                      padding: const EdgeInsets.symmetric(horizontal: 1.5),
                       child: Transform.translate(
-                        offset: Offset(0, -3 * _animations[index].value),
+                        offset: Offset(0, -4 * _animations[index].value),
                         child: Container(
-                          width: 5,
-                          height: 5,
+                          width: 6,
+                          height: 6,
                           decoration: BoxDecoration(
-                            color: Colors.grey[700],
+                            color: dotColor,
                             shape: BoxShape.circle,
                           ),
                         ),

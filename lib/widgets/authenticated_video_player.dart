@@ -105,22 +105,30 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
         ),
         errorBuilder: (context, errorMessage) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error, color: Colors.red, size: 42),
-                const SizedBox(height: 8),
-                Text(
-                  'Error: $errorMessage',
-                  style: const TextStyle(color: Colors.red),
-                  textAlign: TextAlign.center,
+            child: SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.error, color: Colors.red, size: 42),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Error: $errorMessage',
+                      style: Theme.of(
+                        context,
+                      ).textTheme.bodySmall?.copyWith(color: Colors.red),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _initializePlayer,
+                      child: const Text('Retry'),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _initializePlayer,
-                  child: const Text('Retry'),
-                ),
-              ],
+              ),
             ),
           );
         },
@@ -316,45 +324,67 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
     Widget content;
 
     if (_isLoading) {
-      content = const Center(
+      content = Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Loading video...'),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              'Loading video...',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       );
     } else if (_hasError) {
       content = Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
-            const SizedBox(height: 16),
-            Text(
-              'Error playing video',
-              style: Theme.of(context).textTheme.titleMedium,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Error playing video',
+                  style: Theme.of(context).textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _errorMessage,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: _initializePlayer,
+                  child: const Text('Retry'),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.red),
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _initializePlayer,
-              child: const Text('Retry'),
-            ),
-          ],
+          ),
         ),
       );
     } else if (_chewieController != null) {
       content = Chewie(controller: _chewieController!);
     } else {
-      content = const Center(child: Text('Unable to load video player'));
+      content = const Center(
+        child: Text(
+          'Unable to load video player',
+          style: TextStyle(color: Colors.grey),
+          textAlign: TextAlign.center,
+        ),
+      );
     }
 
     if (widget.heroTag != null) {

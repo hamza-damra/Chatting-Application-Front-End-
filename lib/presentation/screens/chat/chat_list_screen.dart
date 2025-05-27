@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../../../presentation/blocs/chat/chat_bloc.dart';
 import '../../../presentation/blocs/chat/chat_event.dart';
 import '../../../presentation/blocs/chat/chat_state.dart';
-import '../../../presentation/widgets/chat/chat_list_item.dart';
+import '../../../domain/models/chat_room_model.dart';
 import '../../../widgets/shimmer_widgets.dart';
 import '../../../providers/chat_provider.dart';
 
@@ -81,19 +81,36 @@ class _ChatListScreenState extends State<ChatListScreen> {
                 context.read<ChatBloc>().add(LoadChatRooms());
               },
               color: theme.colorScheme.primary,
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: state.chatRooms.length,
-                itemBuilder: (context, index) {
-                  final chatRoom = state.chatRooms[index];
-                  return ChatListItem(
-                    chatRoom: chatRoom,
-                    currentUserId: state.currentUserId,
-                    onTap: () {
-                      Navigator.pushNamed(context, '/chat/${chatRoom.id}');
-                    },
-                  );
-                },
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(20.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Section Header
+                    _buildSectionHeader('Recent Chats', theme),
+                    const SizedBox(height: 16),
+
+                    // Chat List
+                    ...state.chatRooms.map(
+                      (chatRoom) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _buildModernChatCard(
+                          chatRoom: chatRoom,
+                          currentUserId: state.currentUserId,
+                          theme: theme,
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              '/chat/${chatRoom.id}',
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 100), // Space for FAB
+                  ],
+                ),
               ),
             );
           } else if (state is ChatFailure) {
@@ -117,110 +134,164 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   Widget _buildEmptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(
-                  alpha: 0.3,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header
+          _buildSectionHeader('Recent Chats', theme),
+          const SizedBox(height: 16),
+
+          // Empty state card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
+              ),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.chat_bubble_outline_rounded,
+                    size: 40,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.chat_bubble_outline_rounded,
-                size: 60,
-                color: theme.colorScheme.primary,
-              ),
+                const SizedBox(height: 24),
+                Text(
+                  'No chats yet',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Start a conversation by tapping the chat button below',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
             ),
-            const SizedBox(height: 24),
-            Text(
-              'No chats yet',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Start a conversation by tapping the chat button below',
-              style: theme.textTheme.bodyLarge?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildErrorState(ThemeData theme, String error) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.errorContainer.withValues(alpha: 0.3),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.error_outline_rounded,
-                size: 60,
-                color: theme.colorScheme.error,
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Failed to load chats',
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header
+          _buildSectionHeader('Recent Chats', theme),
+          const SizedBox(height: 16),
+
+          // Error state card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.1),
               ),
             ),
-            const SizedBox(height: 12),
-            Text(
-              error,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                context.read<ChatBloc>().add(LoadChatRooms());
-              },
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+            child: Column(
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.error.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.error_outline_rounded,
+                    size: 40,
+                    color: theme.colorScheme.error,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 24),
+                Text(
+                  'Failed to load chats',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  error,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    context.read<ChatBloc>().add(LoadChatRooms());
+                  },
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: theme.colorScheme.primary,
+                    foregroundColor: theme.colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildLoadingState() {
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: 6,
-      itemBuilder: (context, index) => ShimmerWidgets.listItemShimmer(),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Section Header
+          _buildSectionHeader('Recent Chats', Theme.of(context)),
+          const SizedBox(height: 16),
+
+          // Loading shimmer cards
+          ...List.generate(
+            6,
+            (index) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: ShimmerWidgets.listItemShimmer(),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -394,5 +465,210 @@ class _ChatListScreenState extends State<ChatListScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
+  }
+
+  Widget _buildSectionHeader(String title, ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: theme.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.bold,
+          color: theme.colorScheme.onSurface,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModernChatCard({
+    required ChatRoomModel chatRoom,
+    required String currentUserId,
+    required ThemeData theme,
+    required VoidCallback onTap,
+  }) {
+    final displayName = chatRoom.getDisplayName(currentUserId);
+    final avatarUrl = chatRoom.getAvatarUrl(currentUserId);
+    final isGroup = chatRoom.type == ChatRoomType.group;
+    final isOnline = chatRoom.isUserOnline(currentUserId);
+    final unreadCount = chatRoom.unreadCount;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.1),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          splashColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+          highlightColor: theme.colorScheme.primary.withValues(alpha: 0.05),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Avatar with status indicator
+                Stack(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child:
+                          avatarUrl.isNotEmpty
+                              ? ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Image.network(
+                                  avatarUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder:
+                                      (context, error, stackTrace) =>
+                                          _buildDefaultAvatar(
+                                            displayName,
+                                            isGroup,
+                                            theme,
+                                          ),
+                                ),
+                              )
+                              : _buildDefaultAvatar(
+                                displayName,
+                                isGroup,
+                                theme,
+                              ),
+                    ),
+                    // Online status indicator for private chats
+                    if (!isGroup && isOnline)
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: theme.colorScheme.surfaceContainerLowest,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(width: 16),
+
+                // Chat info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              displayName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (chatRoom.lastMessageTime != null)
+                            Text(
+                              _formatTime(chatRoom.lastMessageTime!),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.6,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              chatRoom.lastMessage ?? 'No messages yet',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurface.withValues(
+                                  alpha: 0.7,
+                                ),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (unreadCount > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primary,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                unreadCount > 99
+                                    ? '99+'
+                                    : unreadCount.toString(),
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: theme.colorScheme.onPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultAvatar(
+    String displayName,
+    bool isGroup,
+    ThemeData theme,
+  ) {
+    return Center(
+      child: Icon(
+        isGroup ? Icons.group_rounded : Icons.person_rounded,
+        size: 20,
+        color: theme.colorScheme.primary,
+      ),
+    );
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}d';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m';
+    } else {
+      return 'now';
+    }
   }
 }

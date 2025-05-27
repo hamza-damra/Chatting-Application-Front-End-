@@ -144,7 +144,8 @@ class _CreatePrivateChatScreenState extends State<CreatePrivateChatScreen> {
 
       final roomId = await chatProvider.createRoom(
         userIds: [user.id.toString()],
-        name: user.fullName, // Use the user's name as the room name
+        name:
+            'Private Chat', // Generic name - display logic will show correct names
         imageUrl: user.profilePicture, // Use the user's profile picture
         isGroup: false, // This is a private chat
       );
@@ -175,7 +176,9 @@ class _CreatePrivateChatScreenState extends State<CreatePrivateChatScreen> {
             final chatRoom = chatProvider.convertRoomToChatRoom(selectedRoom);
 
             // Navigate to the chat screen with the newly created room
-            navigator.pop(); // Close create chat screen
+            navigator.pop(
+              true,
+            ); // Close create chat screen with success indicator
             navigator.push(
               MaterialPageRoute(
                 builder: (context) => ChatScreen(chatRoom: chatRoom),

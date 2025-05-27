@@ -204,7 +204,7 @@ class WebSocketFileUploader {
 
   /// Get maximum file size allowed (in bytes)
   int getMaxFileSize() {
-    return 50 * 1024 * 1024; // 50MB
+    return 1024 * 1024 * 1024; // 1GB
   }
 
   /// Validate file before upload

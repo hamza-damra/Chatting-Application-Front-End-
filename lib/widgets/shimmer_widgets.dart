@@ -3,20 +3,58 @@ import 'package:shimmer/shimmer.dart';
 
 /// Collection of reusable shimmer loading widgets for different use cases
 class ShimmerWidgets {
+  /// Get theme-aware shimmer colors
+  static Map<String, Color> _getShimmerColors(
+    BuildContext? context, {
+    Color? baseColor,
+    Color? highlightColor,
+  }) {
+    if (baseColor != null && highlightColor != null) {
+      return {'base': baseColor, 'highlight': highlightColor};
+    }
+
+    final isDark =
+        context != null
+            ? Theme.of(context).brightness == Brightness.dark
+            : false;
+
+    if (isDark) {
+      return {'base': Colors.grey[800]!, 'highlight': Colors.grey[700]!};
+    } else {
+      return {'base': Colors.grey[300]!, 'highlight': Colors.grey[100]!};
+    }
+  }
+
+  /// Get theme-aware container color
+  static Color _getContainerColor(BuildContext? context) {
+    final isDark =
+        context != null
+            ? Theme.of(context).brightness == Brightness.dark
+            : false;
+    return isDark ? Colors.grey[850]! : Colors.white;
+  }
+
   /// Basic circular shimmer for replacing CircularProgressIndicator
   static Widget circularShimmer({
     double size = 40.0,
     Color? baseColor,
     Color? highlightColor,
+    BuildContext? context,
   }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: _getContainerColor(context),
           shape: BoxShape.circle,
         ),
       ),
@@ -24,18 +62,29 @@ class ShimmerWidgets {
   }
 
   /// Loading shimmer with text for auth/page loading
-  static Widget authLoadingShimmer({Color? baseColor, Color? highlightColor}) {
+  static Widget authLoadingShimmer({
+    Color? baseColor,
+    Color? highlightColor,
+    BuildContext? context,
+  }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
             width: 60,
             height: 60,
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: containerColor,
               shape: BoxShape.circle,
             ),
           ),
@@ -44,7 +93,7 @@ class ShimmerWidgets {
             width: 120,
             height: 16,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: containerColor,
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -59,15 +108,23 @@ class ShimmerWidgets {
     double height = 20.0,
     Color? baseColor,
     Color? highlightColor,
+    BuildContext? context,
   }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.white.withValues(alpha: 0.3),
-      highlightColor: highlightColor ?? Colors.white.withValues(alpha: 0.7),
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Container(
         width: width,
         height: height,
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: containerColor,
           shape: BoxShape.circle,
         ),
       ),
@@ -81,15 +138,23 @@ class ShimmerWidgets {
     BorderRadius? borderRadius,
     Color? baseColor,
     Color? highlightColor,
+    BuildContext? context,
   }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Container(
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: containerColor,
           borderRadius: borderRadius ?? BorderRadius.circular(8),
         ),
       ),
@@ -102,17 +167,20 @@ class ShimmerWidgets {
     double height = 180,
     bool isCurrentUser = false,
     Color? primaryColor,
+    BuildContext? context,
   }) {
+    final containerColor = _getContainerColor(context);
+
     final baseColor =
         isCurrentUser
             ? (primaryColor?.withValues(alpha: 0.3) ??
                 Colors.blue.withValues(alpha: 0.3))
-            : Colors.grey[300]!;
+            : _getShimmerColors(context)['base']!;
     final highlightColor =
         isCurrentUser
             ? (primaryColor?.withValues(alpha: 0.1) ??
                 Colors.blue.withValues(alpha: 0.1))
-            : Colors.grey[100]!;
+            : _getShimmerColors(context)['highlight']!;
 
     return Shimmer.fromColors(
       baseColor: baseColor,
@@ -121,57 +189,65 @@ class ShimmerWidgets {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: containerColor,
           borderRadius: BorderRadius.circular(12),
         ),
-        child: const Icon(Icons.image, size: 40, color: Colors.white54),
+        child: Icon(
+          Icons.image,
+          size: 40,
+          color: containerColor.withValues(alpha: 0.54),
+        ),
       ),
     );
   }
 
   /// List item shimmer for chat/user lists
-  static Widget listItemShimmer({Color? baseColor, Color? highlightColor}) {
+  static Widget listItemShimmer({
+    Color? baseColor,
+    Color? highlightColor,
+    BuildContext? context,
+  }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+    final isDark =
+        context != null
+            ? Theme.of(context).brightness == Brightness.dark
+            : false;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.12),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-            spreadRadius: 0,
-          ),
-          BoxShadow(
-            color: Colors.grey.withValues(alpha: 0.06),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-            spreadRadius: 0,
-          ),
-        ],
+        color: containerColor,
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.grey.withValues(alpha: 0.08),
-          width: 0.5,
+          color:
+              isDark
+                  ? Colors.grey.withValues(alpha: 0.3)
+                  : Colors.grey.withValues(alpha: 0.1),
+          width: 1,
         ),
       ),
       child: Shimmer.fromColors(
-        baseColor: baseColor ?? Colors.grey[300]!,
-        highlightColor: highlightColor ?? Colors.grey[100]!,
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
         child: Padding(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
               // Professional Avatar
               Container(
-                width: 64,
-                height: 64,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              const SizedBox(width: 18),
+              const SizedBox(width: 16),
               // Content
               Expanded(
                 child: Column(
@@ -185,7 +261,7 @@ class ShimmerWidgets {
                           width: 140,
                           height: 16,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: containerColor,
                             borderRadius: BorderRadius.circular(8),
                           ),
                         ),
@@ -194,7 +270,7 @@ class ShimmerWidgets {
                           width: 40,
                           height: 12,
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: containerColor,
                             borderRadius: BorderRadius.circular(6),
                           ),
                         ),
@@ -208,7 +284,7 @@ class ShimmerWidgets {
                           child: Container(
                             height: 14,
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: containerColor,
                               borderRadius: BorderRadius.circular(7),
                             ),
                           ),
@@ -218,8 +294,8 @@ class ShimmerWidgets {
                         Container(
                           width: 20,
                           height: 20,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: containerColor,
                             shape: BoxShape.circle,
                           ),
                         ),
@@ -236,10 +312,21 @@ class ShimmerWidgets {
   }
 
   /// File loading shimmer
-  static Widget fileLoadingShimmer({Color? baseColor, Color? highlightColor}) {
+  static Widget fileLoadingShimmer({
+    Color? baseColor,
+    Color? highlightColor,
+    BuildContext? context,
+  }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -247,13 +334,13 @@ class ShimmerWidgets {
             width: 80,
             height: 80,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: containerColor,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.description,
               size: 40,
-              color: Colors.white54,
+              color: containerColor.withValues(alpha: 0.54),
             ),
           ),
           const SizedBox(height: 16),
@@ -261,7 +348,7 @@ class ShimmerWidgets {
             width: 150,
             height: 16,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: containerColor,
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -271,10 +358,21 @@ class ShimmerWidgets {
   }
 
   /// Media preview shimmer
-  static Widget mediaPreviewShimmer({Color? baseColor, Color? highlightColor}) {
+  static Widget mediaPreviewShimmer({
+    Color? baseColor,
+    Color? highlightColor,
+    BuildContext? context,
+  }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -282,13 +380,13 @@ class ShimmerWidgets {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: containerColor,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
+            child: Icon(
               Icons.play_circle_outline,
               size: 60,
-              color: Colors.white54,
+              color: containerColor.withValues(alpha: 0.54),
             ),
           ),
           const SizedBox(height: 20),
@@ -296,7 +394,7 @@ class ShimmerWidgets {
             width: 200,
             height: 8,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: containerColor,
               borderRadius: BorderRadius.circular(4),
             ),
           ),
@@ -305,7 +403,7 @@ class ShimmerWidgets {
             width: 100,
             height: 16,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: containerColor,
               borderRadius: BorderRadius.circular(8),
             ),
           ),
@@ -318,12 +416,20 @@ class ShimmerWidgets {
   static Widget fullScreenImageShimmer({
     Color? baseColor,
     Color? highlightColor,
+    BuildContext? context,
   }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Container(
       color: Colors.black,
       child: Shimmer.fromColors(
-        baseColor: baseColor ?? Colors.grey[800]!,
-        highlightColor: highlightColor ?? Colors.grey[600]!,
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -331,17 +437,21 @@ class ShimmerWidgets {
               width: 100,
               height: 100,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: containerColor,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.image, size: 50, color: Colors.white54),
+              child: Icon(
+                Icons.image,
+                size: 50,
+                color: containerColor.withValues(alpha: 0.54),
+              ),
             ),
             const SizedBox(height: 24),
             Container(
               width: 120,
               height: 16,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: containerColor,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -352,10 +462,21 @@ class ShimmerWidgets {
   }
 
   /// Profile screen shimmer
-  static Widget profileShimmer({Color? baseColor, Color? highlightColor}) {
+  static Widget profileShimmer({
+    Color? baseColor,
+    Color? highlightColor,
+    BuildContext? context,
+  }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
         child: Column(
@@ -365,8 +486,8 @@ class ShimmerWidgets {
             Container(
               width: 120,
               height: 120,
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: containerColor,
                 shape: BoxShape.circle,
               ),
             ),
@@ -377,7 +498,7 @@ class ShimmerWidgets {
               width: 200,
               height: 24,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: containerColor,
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
@@ -388,7 +509,7 @@ class ShimmerWidgets {
               width: 160,
               height: 16,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: containerColor,
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
@@ -403,7 +524,7 @@ class ShimmerWidgets {
                   width: double.infinity,
                   height: 72,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: containerColor,
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
@@ -416,7 +537,7 @@ class ShimmerWidgets {
               width: double.infinity,
               height: 50,
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: containerColor,
                 borderRadius: BorderRadius.circular(25),
               ),
             ),
@@ -431,15 +552,23 @@ class ShimmerWidgets {
     double size = 40.0,
     Color? baseColor,
     Color? highlightColor,
+    BuildContext? context,
   }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Container(
         width: size,
         height: size,
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: containerColor,
           shape: BoxShape.circle,
         ),
       ),
@@ -450,19 +579,34 @@ class ShimmerWidgets {
   static Widget profileInfoCardShimmer({
     Color? baseColor,
     Color? highlightColor,
+    BuildContext? context,
   }) {
+    final colors = _getShimmerColors(
+      context,
+      baseColor: baseColor,
+      highlightColor: highlightColor,
+    );
+    final containerColor = _getContainerColor(context);
+    final isDark =
+        context != null
+            ? Theme.of(context).brightness == Brightness.dark
+            : false;
+
     return Shimmer.fromColors(
-      baseColor: baseColor ?? Colors.grey[300]!,
-      highlightColor: highlightColor ?? Colors.grey[100]!,
+      baseColor: colors['base']!,
+      highlightColor: colors['highlight']!,
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: containerColor,
           borderRadius: BorderRadius.circular(8),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withValues(alpha: 0.1),
+              color:
+                  isDark
+                      ? Colors.black.withValues(alpha: 0.3)
+                      : Colors.grey.withValues(alpha: 0.1),
               spreadRadius: 1,
               blurRadius: 3,
               offset: const Offset(0, 1),
@@ -476,7 +620,7 @@ class ShimmerWidgets {
               width: 24,
               height: 24,
               decoration: BoxDecoration(
-                color: Colors.grey[400],
+                color: isDark ? Colors.grey[600] : Colors.grey[400],
                 borderRadius: BorderRadius.circular(4),
               ),
             ),
@@ -490,7 +634,7 @@ class ShimmerWidgets {
                     width: 60,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: Colors.grey[400],
+                      color: isDark ? Colors.grey[600] : Colors.grey[400],
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
@@ -499,7 +643,7 @@ class ShimmerWidgets {
                     width: double.infinity,
                     height: 16,
                     decoration: BoxDecoration(
-                      color: Colors.grey[400],
+                      color: isDark ? Colors.grey[600] : Colors.grey[400],
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'shimmer_widgets.dart';
+import 'profile_image_widget.dart';
 
 class UserAvatar extends StatelessWidget {
   final String? imageUrl;
   final String name;
   final double size;
   final Color? backgroundColor;
+  final int? userId; // NEW: Optional userId for direct image access
 
   const UserAvatar({
     super.key,
@@ -14,12 +16,25 @@ class UserAvatar extends StatelessWidget {
     required this.name,
     this.size = 40.0,
     this.backgroundColor,
+    this.userId, // NEW: Optional userId parameter
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    // NEW: Use ProfileImageWidget if userId is provided (preferred method)
+    if (userId != null) {
+      return ProfileImageWidget(
+        userId: userId,
+        userName: name,
+        size: size,
+        backgroundColor: backgroundColor ?? theme.colorScheme.primary,
+        textColor: Colors.white,
+      );
+    }
+
+    // LEGACY: Fall back to old imageUrl-based approach for backward compatibility
     return imageUrl != null && imageUrl!.isNotEmpty
         ? CachedNetworkImage(
           imageUrl: imageUrl!,
@@ -31,6 +46,7 @@ class UserAvatar extends StatelessWidget {
           placeholder:
               (context, url) => ShimmerWidgets.avatarShimmer(
                 size: size,
+                context: context,
                 baseColor:
                     backgroundColor?.withValues(alpha: 0.3) ??
                     theme.colorScheme.primary.withValues(alpha: 0.3),

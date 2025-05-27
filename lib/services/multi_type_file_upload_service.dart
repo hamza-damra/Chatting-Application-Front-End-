@@ -18,14 +18,34 @@ enum FileCategory { image, document, audio, video, other }
 /// Compatible with the updated backend file handling system
 class MultiTypeFileUploadService {
   static const int chunkSize = 64 * 1024; // 64KB chunks as recommended
-  static const int maxFileSize = 10 * 1024 * 1024; // 10MB limit
+  static const int maxFileSize = 1024 * 1024 * 1024; // 1GB limit
 
   final WebSocketService _webSocketService;
   final _supportedTypes = {
-    FileCategory.image: ['.jpeg', '.jpg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff'],
+    FileCategory.image: [
+      '.jpeg',
+      '.jpg',
+      '.png',
+      '.gif',
+      '.webp',
+      '.svg',
+      '.bmp',
+      '.tiff',
+    ],
     FileCategory.document: [
-      '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', 
-      '.txt', '.html', '.css', '.js', '.json', '.xml'
+      '.pdf',
+      '.doc',
+      '.docx',
+      '.xls',
+      '.xlsx',
+      '.ppt',
+      '.pptx',
+      '.txt',
+      '.html',
+      '.css',
+      '.js',
+      '.json',
+      '.xml',
     ],
     FileCategory.audio: ['.mp3', '.wav', '.ogg', '.aac', '.flac'],
     FileCategory.video: ['.mp4', '.mpeg', '.webm', '.mov', '.avi'],
@@ -74,21 +94,24 @@ class MultiTypeFileUploadService {
     try {
       final progress = jsonDecode(frame.body!);
       final uploadId = progress['uploadId'];
-      
+
       if (uploadId != null && _activeUploads.containsKey(uploadId)) {
         final upload = _activeUploads[uploadId]!;
         final chunkIndex = progress['chunkIndex'];
         final totalChunks = progress['totalChunks'];
-        
+
         AppLogger.i(
           'MultiTypeFileUploadService',
           'Progress update for $uploadId: $chunkIndex/$totalChunks',
         );
-        
+
         upload.onProgress?.call(chunkIndex, totalChunks);
       }
     } catch (e) {
-      AppLogger.e('MultiTypeFileUploadService', 'Error handling progress update: $e');
+      AppLogger.e(
+        'MultiTypeFileUploadService',
+        'Error handling progress update: $e',
+      );
     }
   }
 
@@ -97,31 +120,35 @@ class MultiTypeFileUploadService {
     try {
       final response = jsonDecode(frame.body!);
       final attachmentUrl = response['attachmentUrl'];
-      
+
       // Try to find the upload by matching the file name
       final fileName = response['content'];
       String? matchedUploadId;
-      
+
       for (final entry in _activeUploads.entries) {
         if (entry.value.fileName == fileName) {
           matchedUploadId = entry.key;
           break;
         }
       }
-      
-      if (matchedUploadId != null && _activeUploads.containsKey(matchedUploadId)) {
+
+      if (matchedUploadId != null &&
+          _activeUploads.containsKey(matchedUploadId)) {
         final upload = _activeUploads[matchedUploadId]!;
-        
+
         AppLogger.i(
           'MultiTypeFileUploadService',
           'Upload complete for $matchedUploadId: $fileName -> $attachmentUrl',
         );
-        
+
         upload.onComplete?.call(response);
         _cleanup(matchedUploadId);
       }
     } catch (e) {
-      AppLogger.e('MultiTypeFileUploadService', 'Error handling upload completion: $e');
+      AppLogger.e(
+        'MultiTypeFileUploadService',
+        'Error handling upload completion: $e',
+      );
     }
   }
 
@@ -131,16 +158,22 @@ class MultiTypeFileUploadService {
       final errorData = jsonDecode(frame.body!);
       final errorMessage = errorData['message'] ?? 'Unknown error';
       final uploadId = _currentUploadId;
-      
-      AppLogger.e('MultiTypeFileUploadService', 'Error from server: $errorMessage');
-      
+
+      AppLogger.e(
+        'MultiTypeFileUploadService',
+        'Error from server: $errorMessage',
+      );
+
       if (uploadId != null && _activeUploads.containsKey(uploadId)) {
         final upload = _activeUploads[uploadId]!;
         upload.onError?.call(errorMessage);
         _cleanup(uploadId);
       }
     } catch (e) {
-      AppLogger.e('MultiTypeFileUploadService', 'Error handling error notification: $e');
+      AppLogger.e(
+        'MultiTypeFileUploadService',
+        'Error handling error notification: $e',
+      );
     }
   }
 
@@ -156,7 +189,7 @@ class MultiTypeFileUploadService {
   }) async {
     try {
       File? file;
-      
+
       // Use FilePicker for all file types
       if (category == null || category == FileCategory.other) {
         // Allow any file type
@@ -168,16 +201,17 @@ class MultiTypeFileUploadService {
         // Filter by category
         FileType fileType;
         List<String>? allowedExtensions;
-        
+
         switch (category) {
           case FileCategory.image:
             fileType = FileType.image;
             break;
           case FileCategory.document:
             fileType = FileType.custom;
-            allowedExtensions = _supportedTypes[FileCategory.document]!
-                .map((e) => e.substring(1)) // Remove the dot
-                .toList();
+            allowedExtensions =
+                _supportedTypes[FileCategory.document]!
+                    .map((e) => e.substring(1)) // Remove the dot
+                    .toList();
             break;
           case FileCategory.audio:
             fileType = FileType.audio;
@@ -188,17 +222,17 @@ class MultiTypeFileUploadService {
           default:
             fileType = FileType.any;
         }
-        
+
         final result = await FilePicker.platform.pickFiles(
           type: fileType,
           allowedExtensions: allowedExtensions,
         );
-        
+
         if (result != null) {
           file = File(result.files.single.path!);
         }
       }
-      
+
       if (file != null) {
         await uploadFile(
           file,
@@ -227,7 +261,7 @@ class MultiTypeFileUploadService {
         source: ImageSource.camera,
         imageQuality: 85,
       );
-      
+
       if (image != null) {
         File file = File(image.path);
         await uploadFile(
@@ -261,7 +295,7 @@ class MultiTypeFileUploadService {
       // Get file information
       final String fileName = path.basename(file.path);
       final int fileSize = await file.length();
-      
+
       // Validate file size
       if (fileSize > maxFileSize) {
         throw Exception(
@@ -388,7 +422,7 @@ class MultiTypeFileUploadService {
     String base64Data,
   ) async {
     final contentType = _getContentType(fileName);
-    
+
     final message = {
       'messageId': null,
       'chatRoomId': chatRoomId,
@@ -405,7 +439,7 @@ class MultiTypeFileUploadService {
       destination: '/app/file.chunk',
       body: jsonEncode(message),
     );
-    
+
     AppLogger.i(
       'MultiTypeFileUploadService',
       'Sent chunk $chunkIndex/$totalChunks for $fileName (type: $contentType)',
@@ -419,7 +453,7 @@ class MultiTypeFileUploadService {
     if (mimeType != null) {
       return mimeType;
     }
-    
+
     // Fallback to extension-based detection
     final extension = path.extension(fileName).toLowerCase();
     switch (extension) {

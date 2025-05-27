@@ -14,7 +14,7 @@ enum FileCategory { image, document, audio, video, other }
 /// Enhanced service for handling file uploads via WebSocket with chunking
 class EnhancedFileUploadService {
   static const int chunkSize = 64 * 1024; // 64KB chunks as recommended
-  static const int maxFileSize = 10 * 1024 * 1024; // 10MB limit
+  static const int maxFileSize = 1024 * 1024 * 1024; // 1GB limit
 
   final WebSocketService _webSocketService;
   final _supportedTypes = {

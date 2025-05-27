@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:chatting_application/domain/models/blocked_user_model.dart';
-import 'package:chatting_application/domain/models/user_model.dart';
+import 'package:vector/domain/models/blocked_user_model.dart';
+import 'package:vector/domain/models/user_model.dart';
 
 void main() {
   group('BlockedUserModel', () {

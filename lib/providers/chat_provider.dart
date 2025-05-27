@@ -3,19 +3,17 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
-import 'package:chatting_application/models/chat_room.dart';
-import 'package:chatting_application/models/message.dart' as app_models;
+import 'package:vector/models/chat_room.dart';
+import 'package:vector/models/message.dart' as app_models;
 import '../services/api_chat_service.dart';
 import '../services/websocket_service.dart';
 import '../models/user_model.dart';
 import '../utils/logger.dart';
 import '../providers/api_auth_provider.dart';
 import '../models/unread_message_notification.dart';
-import '../services/spring_boot_push_manager.dart';
-import '../core/di/service_locator.dart';
-import '../core/services/token_service.dart';
 import '../services/background_notification_manager.dart';
 import '../services/notification_service.dart';
+import '../services/screen_state_manager.dart';
 import '../utils/url_utils.dart';
 
 class ChatProvider with ChangeNotifier {
@@ -554,118 +552,8 @@ class ChatProvider with ChangeNotifier {
     // Subscribe to rich unread message notifications
     _subscribeToUnreadNotifications();
 
-    // Initialize push notifications if user is authenticated
-    await _initializePushNotifications();
-  }
-
-  // Initialize push notifications
-  Future<void> _initializePushNotifications() async {
-    try {
-      final user = _authProvider.user;
-      if (user != null) {
-        AppLogger.i(
-          'ChatProvider',
-          'Initializing push notifications for user: ${user.id}',
-        );
-
-        // Get auth token from service locator
-        final tokenService = serviceLocator<TokenService>();
-        final authToken = await tokenService.getAccessToken() ?? '';
-
-        if (authToken.isEmpty) {
-          AppLogger.w(
-            'ChatProvider',
-            'No auth token available for push notifications',
-          );
-          return;
-        }
-
-        await SpringBootPushManager.initialize(
-          userId: user.id.toString(),
-          authToken: authToken,
-          onDeviceRegistered: (deviceId) {
-            AppLogger.i('ChatProvider', 'Device registered: $deviceId');
-          },
-          onMessageReceived: (messageData) {
-            AppLogger.i(
-              'ChatProvider',
-              'Push notification received: $messageData',
-            );
-            _handlePushNotification(messageData);
-          },
-        );
-
-        // Update user status to online
-        await SpringBootPushManager.updateUserStatus(
-          isOnline: true,
-          activeRoomId: _selectedRoom?.id,
-        );
-
-        AppLogger.i(
-          'ChatProvider',
-          'Push notifications initialized successfully',
-        );
-      } else {
-        AppLogger.w(
-          'ChatProvider',
-          'User not authenticated, skipping push notification initialization',
-        );
-      }
-    } catch (e) {
-      AppLogger.e('ChatProvider', 'Error initializing push notifications: $e');
-    }
-  }
-
-  // Handle incoming push notifications
-  void _handlePushNotification(Map<String, dynamic> messageData) {
-    try {
-      final type = messageData['type'] as String?;
-
-      if (type == 'chat_message') {
-        final chatRoomId = messageData['chatRoomId'] as String?;
-        final senderName = messageData['senderName'] as String?;
-        final messageContent = messageData['messageContent'] as String?;
-
-        AppLogger.i(
-          'ChatProvider',
-          'Handling chat message push notification for room: $chatRoomId',
-        );
-
-        // If the user is not currently in this chat room, show notification
-        if (_selectedRoom?.id != chatRoomId) {
-          // Create notification object
-          final notification = UnreadMessageNotification(
-            messageId: int.tryParse(messageData['messageId'] ?? '0') ?? 0,
-            chatRoomId: int.tryParse(chatRoomId ?? '0') ?? 0,
-            chatRoomName: messageData['chatRoomName'] ?? 'New Message',
-            senderId: int.tryParse(messageData['senderId'] ?? '0') ?? 0,
-            senderUsername: senderName ?? 'Unknown',
-            senderFullName: senderName,
-            contentPreview: messageContent,
-            contentType: messageData['contentType'] ?? 'TEXT',
-            sentAt:
-                DateTime.tryParse(messageData['timestamp'] ?? '') ??
-                DateTime.now(),
-            notificationTimestamp: DateTime.now(),
-            unreadCount: 1,
-            totalUnreadCount: 1,
-            recipientUserId: currentUserId,
-            isPrivateChat: messageData['isPrivateChat'] == true,
-            participantCount:
-                int.tryParse(messageData['participantCount'] ?? '2') ?? 2,
-            attachmentUrl: messageData['attachmentUrl'],
-            notificationType: NotificationType.newMessage,
-          );
-
-          // Forward to notification provider
-          if (_onNotificationReceived != null) {
-            _onNotificationReceived!(notification);
-          }
-        }
-      }
-    } catch (e) {
-      AppLogger.e('ChatProvider', 'Error handling push notification: $e');
-    }
+    // Note: Push notifications are now initialized globally in main.dart
+    // This ensures they work regardless of which screen the user is on when backgrounding the app
   }
 
   // Set up notification callback (called from main app)
@@ -1543,6 +1431,17 @@ class ChatProvider with ChangeNotifier {
   // Maximum retry attempts for failed messages
   final int maxRetryAttempts = 3;
 
+  // Helper method to get user name by ID
+  String getUserNameById(int userId) {
+    try {
+      final user = _users.firstWhere((user) => user.id == userId);
+      return user.fullName;
+    } catch (e) {
+      AppLogger.w('ChatProvider', 'User not found for ID: $userId');
+      return 'Unknown User';
+    }
+  }
+
   // Send a text message
   Future<app_models.Message> sendTextMessage({
     required String roomId,
@@ -1943,10 +1842,10 @@ class ChatProvider with ChangeNotifier {
         throw Exception('Image file does not exist');
       }
 
-      // Validate file size (max 5MB)
+      // Validate file size (max 1GB)
       final fileSize = await imageFile.length();
-      if (fileSize > 5 * 1024 * 1024) {
-        throw Exception('Image file is too large (max 5MB)');
+      if (fileSize > 1024 * 1024 * 1024) {
+        throw Exception('Image file is too large (max 1GB)');
       }
 
       // Read image file as bytes
@@ -2141,6 +2040,7 @@ class ChatProvider with ChangeNotifier {
       senderName: senderName,
       content: content,
       attachmentUrl: attachmentUrl,
+      downloadUrl: null, // Will be populated by backend when available
       contentType: contentType,
       sentAt:
           message.createdAt != null
@@ -2516,6 +2416,16 @@ class ChatProvider with ChangeNotifier {
   /// Determine if notification should be shown for a message
   bool _shouldShowNotificationForMessage(String roomId) {
     try {
+      // Check if notification should be suppressed based on current screen
+      final screenStateManager = ScreenStateManager.instance;
+      if (screenStateManager.shouldSuppressNotification(roomId)) {
+        AppLogger.d(
+          'ChatProvider',
+          'Not showing notification for room $roomId - suppressed by screen state manager',
+        );
+        return false;
+      }
+
       // Don't show notification if user is currently viewing this room
       if (_selectedRoom?.id == roomId) {
         AppLogger.d(

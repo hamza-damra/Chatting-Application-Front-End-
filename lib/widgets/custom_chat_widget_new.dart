@@ -3,6 +3,8 @@ import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import '../models/message.dart';
 import '../services/improved_file_upload_service.dart';
+import '../providers/message_pagination_provider.dart';
+import '../providers/chat_provider.dart';
 import '../presentation/widgets/chat/professional_chat_input.dart';
 import '../presentation/widgets/chat/professional_attachment_menu.dart';
 import '../presentation/widgets/chat/professional_file_upload_handler.dart';
@@ -19,7 +21,6 @@ import 'video_player_widget.dart';
 import '../custom_routes.dart';
 
 class CustomChatWidgetNew extends StatefulWidget {
-  final List<Message> messages;
   final Function(String) onSendMessage;
   final Function(String, String) onSendAttachment;
   final int currentUserId;
@@ -28,10 +29,10 @@ class CustomChatWidgetNew extends StatefulWidget {
   final int roomId;
   final int? otherUserId;
   final String? otherUserName;
+  final int pageSize;
 
   const CustomChatWidgetNew({
     super.key,
-    required this.messages,
     required this.onSendMessage,
     required this.onSendAttachment,
     required this.currentUserId,
@@ -40,6 +41,7 @@ class CustomChatWidgetNew extends StatefulWidget {
     this.showUserAvatars = true,
     this.otherUserId,
     this.otherUserName,
+    this.pageSize = 20,
   });
 
   @override
@@ -53,17 +55,19 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   String _currentFileName = '';
-  int _previousMessageCount = 0;
   ProfessionalFileUploadHandler? _fileUploadHandler;
+  MessagePaginationProvider? _paginationProvider;
 
   @override
   void initState() {
     super.initState();
-    _previousMessageCount = widget.messages.length;
 
-    // Schedule a scroll to bottom on initial load
+    // Add scroll listener for pagination
+    _scrollController.addListener(_onScroll);
+
+    // Initialize pagination provider and load initial messages
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
+      _initializePagination();
     });
   }
 
@@ -85,31 +89,165 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+
+    // Remove ChatProvider listener
+    try {
+      final chatProvider = context.read<ChatProvider>();
+      chatProvider.removeListener(_onChatProviderUpdate);
+    } catch (e) {
+      // Context might be disposed, ignore error
+      AppLogger.w(
+        'CustomChatWidgetNew',
+        'Error removing ChatProvider listener: $e',
+      );
+    }
+
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  /// Initialize pagination provider and load initial messages
+  void _initializePagination() {
+    _paginationProvider = context.read<MessagePaginationProvider>();
+
+    // Load initial messages
+    _paginationProvider!
+        .loadMessages(widget.roomId, size: widget.pageSize)
+        .then((_) {
+          // Scroll to bottom after loading initial messages
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _scrollToBottom();
+          });
+        });
+
+    // Set up WebSocket integration for real-time messages
+    _setupWebSocketIntegration();
+  }
+
+  /// Set up WebSocket integration for real-time messages
+  void _setupWebSocketIntegration() {
+    final chatProvider = context.read<ChatProvider>();
+
+    // Listen to new messages from ChatProvider and add them to pagination provider
+    chatProvider.addListener(_onChatProviderUpdate);
+  }
+
+  /// Handle updates from ChatProvider (WebSocket messages)
+  void _onChatProviderUpdate() {
+    if (_paginationProvider == null) return;
+
+    final chatProvider = context.read<ChatProvider>();
+    final providerMessages = chatProvider.getMessages(widget.roomId.toString());
+
+    // Check if there are new messages that aren't in our pagination provider
+    bool hasNewMessages = false;
+    for (final typesMsg in providerMessages) {
+      final convertedMessage = _convertTypesMessageToMessage(typesMsg);
+
+      // Only add if it's not already in our pagination provider
+      if (!_paginationProvider!.messages.any(
+        (m) => m.id == convertedMessage.id,
+      )) {
+        AppLogger.i(
+          'CustomChatWidgetNew',
+          'Adding new real-time message ${convertedMessage.id} to pagination provider',
+        );
+        _paginationProvider!.addMessage(convertedMessage);
+        hasNewMessages = true;
+      }
+    }
+
+    // Only scroll to bottom if we actually added new messages
+    if (hasNewMessages) {
+      AppLogger.i(
+        'CustomChatWidgetNew',
+        'New messages added, scrolling to bottom',
+      );
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    }
+  }
+
+  /// Convert types.Message to Message for pagination provider
+  Message _convertTypesMessageToMessage(dynamic typesMsg) {
+    String? attachmentUrl;
+    String? contentType;
+    String? content = typesMsg.id; // Default content
+
+    if (typesMsg.runtimeType.toString().contains('TextMessage')) {
+      content = typesMsg.text;
+      contentType = 'text/plain';
+    } else if (typesMsg.runtimeType.toString().contains('ImageMessage')) {
+      attachmentUrl = typesMsg.uri;
+      contentType = 'image/jpeg';
+      content = typesMsg.name;
+    } else if (typesMsg.runtimeType.toString().contains('FileMessage')) {
+      content = typesMsg.uri;
+      attachmentUrl = typesMsg.uri;
+      contentType = typesMsg.mimeType ?? 'application/octet-stream';
+    } else if (typesMsg.runtimeType.toString().contains('CustomMessage')) {
+      final metadata = typesMsg.metadata;
+      if (metadata != null) {
+        attachmentUrl = metadata['attachmentUrl'] as String?;
+        contentType = metadata['contentType'] as String?;
+        content = metadata['fileName'] as String? ?? 'File';
+      }
+    }
+
+    return Message(
+      id: int.tryParse(typesMsg.id) ?? 0,
+      roomId: widget.roomId,
+      senderId: int.tryParse(typesMsg.author.id) ?? 0,
+      senderName:
+          '${typesMsg.author.firstName ?? ''} ${typesMsg.author.lastName ?? ''}'
+              .trim(),
+      content: content,
+      contentType: contentType,
+      attachmentUrl: attachmentUrl,
+      sentAt:
+          typesMsg.createdAt != null
+              ? DateTime.fromMillisecondsSinceEpoch(typesMsg.createdAt!)
+              : DateTime.now(),
+    );
+  }
+
+  /// Handle scroll events for pagination
+  void _onScroll() {
+    if (!_scrollController.hasClients || _paginationProvider == null) return;
+
+    // Check if we've scrolled to the top (for loading older messages)
+    // In a reversed ListView, scrolling up means reaching maxScrollExtent
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      // Load more messages if available
+      if (_paginationProvider!.canLoadMore) {
+        AppLogger.i(
+          'CustomChatWidgetNew',
+          'Loading more messages due to scroll position',
+        );
+        _paginationProvider!.loadMoreMessages(size: widget.pageSize);
+      }
+    }
   }
 
   @override
   void didUpdateWidget(CustomChatWidgetNew oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // If messages changed, ensure we update the UI properly
-    if (widget.messages != oldWidget.messages) {
-      // If new messages were added, scroll to bottom
-      if (widget.messages.length > _previousMessageCount) {
-        AppLogger.i(
-          'CustomChatWidgetNew',
-          'New messages detected. Auto-scrolling to bottom.',
-        );
+    // If room ID changed, reset pagination and load new messages
+    if (widget.roomId != oldWidget.roomId) {
+      AppLogger.i(
+        'CustomChatWidgetNew',
+        'Room ID changed from ${oldWidget.roomId} to ${widget.roomId}',
+      );
 
-        // For reversed ListView, we need to scroll to position 0 for newest messages
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
+      if (_paginationProvider != null) {
+        _paginationProvider!.reset();
+        _paginationProvider!.loadMessages(widget.roomId, size: widget.pageSize);
       }
-
-      _previousMessageCount = widget.messages.length;
     }
   }
 
@@ -142,9 +280,15 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
   void _sendMessage() {
     final message = _messageController.text.trim();
     if (message.isNotEmpty) {
+      // Send message through the original handler
       widget.onSendMessage(message);
       _messageController.clear();
-      // No need to call _scrollToBottom here as didUpdateWidget will handle it
+
+      // The message will be added to pagination provider through WebSocket integration
+      // Just scroll to bottom
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
     }
   }
 
@@ -175,7 +319,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       userFriendlyError =
           'This file type is not supported. Try using JPEG, PNG, PDF, or TXT format.';
     } else if (error.contains('File size exceeds')) {
-      userFriendlyError = 'File is too large. Please select a file under 10MB.';
+      userFriendlyError = 'File is too large. Please select a file under 1GB.';
     } else if (error.contains('timed out')) {
       userFriendlyError =
           'Upload timed out. Check your connection and try again with a smaller file.';
@@ -316,53 +460,119 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child:
-              widget.messages.isEmpty
-                  ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(
-                          Icons.chat_bubble_outline,
-                          color: Colors.grey,
-                          size: 48,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'No messages yet',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const Text(
-                          'Start the conversation!',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ],
-                    ),
-                  )
-                  : ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.all(16),
-                    itemCount: widget.messages.length,
-                    // Reverse the ListView so newest messages are at the bottom
-                    reverse: true,
-                    itemBuilder: (context, index) {
-                      // When reversed, we need to access items in reverse order
-                      final message =
-                          widget.messages[widget.messages.length - 1 - index];
-                      final isCurrentUser =
-                          message.senderId == widget.currentUserId;
+    return Consumer<MessagePaginationProvider>(
+      builder: (context, paginationProvider, child) {
+        return Column(
+          children: [
+            Expanded(child: _buildMessagesList(paginationProvider)),
+            if (_isUploading) _buildProgressIndicator(),
+            if (_isAttachmentMenuOpen) _buildProfessionalAttachmentMenu(),
+            _buildChatInput(),
+          ],
+        );
+      },
+    );
+  }
 
-                      return _buildMessageItem(message, isCurrentUser);
-                    },
-                  ),
+  Widget _buildMessagesList(MessagePaginationProvider paginationProvider) {
+    // Show loading indicator for initial load
+    if (paginationProvider.isLoading && paginationProvider.messages.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading messages...'),
+          ],
         ),
-        if (_isUploading) _buildProgressIndicator(),
-        if (_isAttachmentMenuOpen) _buildProfessionalAttachmentMenu(),
-        _buildChatInput(),
-      ],
+      );
+    }
+
+    // Show error state
+    if (paginationProvider.hasError && paginationProvider.messages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'Error loading messages',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              paginationProvider.errorMessage,
+              style: const TextStyle(color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed:
+                  () => paginationProvider.refresh(size: widget.pageSize),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show empty state
+    if (paginationProvider.messages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.chat_bubble_outline, color: Colors.grey, size: 48),
+            const SizedBox(height: 16),
+            Text(
+              'No messages yet',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const Text(
+              'Start the conversation!',
+              style: TextStyle(color: Colors.grey),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Show messages list with pagination
+    return ListView.builder(
+      controller: _scrollController,
+      padding: const EdgeInsets.all(16),
+      itemCount:
+          paginationProvider.messages.length +
+          (paginationProvider.isLoadingMore ? 1 : 0),
+      reverse: true,
+      itemBuilder: (context, index) {
+        // Show loading indicator at the top when loading more
+        if (index == paginationProvider.messages.length) {
+          return const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Center(
+              child: Column(
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 8),
+                  Text('Loading older messages...'),
+                ],
+              ),
+            ),
+          );
+        }
+
+        // When reversed, we need to access items in reverse order
+        final message =
+            paginationProvider.messages[paginationProvider.messages.length -
+                1 -
+                index];
+        final isCurrentUser = message.senderId == widget.currentUserId;
+
+        return _buildMessageItem(message, isCurrentUser);
+      },
     );
   }
 
@@ -527,11 +737,28 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
         padding: _getPaddingForMessage(message),
         decoration: BoxDecoration(
           color:
-              isCurrentUser ? Theme.of(context).primaryColor : Colors.grey[300],
+              isCurrentUser
+                  ? Theme.of(context).colorScheme.primary
+                  : (Theme.of(context).brightness == Brightness.dark
+                      ? Theme.of(context).colorScheme.surfaceContainerHigh
+                      : Theme.of(context).colorScheme.surfaceContainerLowest),
           borderRadius: _getBorderRadiusForMessage(message, isCurrentUser),
+          border: Border.all(
+            color:
+                isCurrentUser
+                    ? Theme.of(
+                      context,
+                    ).colorScheme.primary.withValues(alpha: 0.3)
+                    : Theme.of(
+                      context,
+                    ).colorScheme.outline.withValues(alpha: 0.2),
+            width: 0.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
+              color: Theme.of(
+                context,
+              ).colorScheme.shadow.withValues(alpha: 0.1),
               blurRadius: 2,
               offset: const Offset(0, 1),
             ),
@@ -549,7 +776,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                     message.senderName ?? 'Unknown',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: isCurrentUser ? Colors.white : Colors.black87,
+                      color:
+                          isCurrentUser
+                              ? Theme.of(context).colorScheme.onPrimary
+                              : Theme.of(context).colorScheme.onSurface,
                       fontSize: 12,
                     ),
                   ),
@@ -586,6 +816,18 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                   message: message,
                   isCurrentUser: isCurrentUser,
                 )
+              // Handle video messages that show as "File" text - check content type
+              else if (message.contentType != null &&
+                  message.contentType!.startsWith('video/') &&
+                  message.content != null &&
+                  message.content!.isNotEmpty)
+                _buildVideoMessageWithLoading(message, isCurrentUser)
+              // Handle image messages that might show as text
+              else if (message.contentType != null &&
+                  message.contentType!.startsWith('image/') &&
+                  message.content != null &&
+                  message.content!.isNotEmpty)
+                _buildImageMessageWithLoading(message, isCurrentUser)
               // Only show text content if it's not an image/video/text file URL in the content field
               else if (message.content != null && message.content!.isNotEmpty)
                 _buildTextContent(message.content!, isCurrentUser)
@@ -602,8 +844,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
                       fontSize: 10,
                       color:
                           isCurrentUser
-                              ? const Color.fromARGB(255, 200, 171, 171)
-                              : Colors.black54,
+                              ? Theme.of(
+                                context,
+                              ).colorScheme.onPrimary.withValues(alpha: 0.7)
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -679,6 +923,494 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     );
   }
 
+  // Handle video messages that might show as "File" text
+  Widget _buildVideoMessageWithLoading(Message message, bool isCurrentUser) {
+    AppLogger.i(
+      'CustomChatWidgetNew',
+      'Building video message with loading: id=${message.id}, contentType=${message.contentType}',
+    );
+
+    final String heroTagId =
+        message.id?.toString() ??
+        DateTime.now().microsecondsSinceEpoch.toString();
+
+    // If content looks like a URL, use it as video URL
+    if (message.content != null &&
+        (message.content!.startsWith('http') ||
+            _isVideoUrl(message.content!))) {
+      return SizedBox(
+        width: 240,
+        child: VideoThumbnail(
+          videoUrl: message.content!,
+          heroTag: 'video-$heroTagId',
+          isCurrentUser: isCurrentUser,
+        ),
+      );
+    }
+
+    // If attachmentUrl is available, use it
+    if (message.attachmentUrl != null && message.attachmentUrl!.isNotEmpty) {
+      String videoUrl = message.attachmentUrl!;
+      if (!videoUrl.startsWith('http')) {
+        videoUrl = 'http://abusaker.zapto.org:8080${message.attachmentUrl!}';
+      }
+      return SizedBox(
+        width: 240,
+        child: VideoThumbnail(
+          videoUrl: videoUrl,
+          heroTag: 'video-$heroTagId',
+          isCurrentUser: isCurrentUser,
+        ),
+      );
+    }
+
+    // Try to construct URL from message ID (fallback for old messages)
+    if (message.id != null) {
+      return _buildVideoWithFallbackUrl(message, isCurrentUser, heroTagId);
+    }
+
+    // Otherwise, show a loading placeholder for video
+    return _buildVideoLoadingPlaceholder(message, isCurrentUser);
+  }
+
+  // Build video widget with fallback URL construction
+  Widget _buildVideoWithFallbackUrl(
+    Message message,
+    bool isCurrentUser,
+    String heroTagId,
+  ) {
+    // Try to get video URL from backend using message ID
+    return FutureBuilder<String?>(
+      future: _getVideoUrlFromMessage(message),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildVideoLoadingPlaceholder(message, isCurrentUser);
+        }
+
+        if (snapshot.hasData && snapshot.data != null) {
+          return SizedBox(
+            width: 240,
+            child: VideoThumbnail(
+              videoUrl: snapshot.data!,
+              heroTag: 'video-$heroTagId',
+              isCurrentUser: isCurrentUser,
+            ),
+          );
+        }
+
+        // If we can't get the URL, show an error placeholder
+        return _buildVideoErrorPlaceholder(message, isCurrentUser);
+      },
+    );
+  }
+
+  // Get video URL from message (try different approaches)
+  Future<String?> _getVideoUrlFromMessage(Message message) async {
+    try {
+      AppLogger.i(
+        'CustomChatWidgetNew',
+        'Attempting to get video URL for message: id=${message.id}, content=${message.content}, attachmentUrl=${message.attachmentUrl}, downloadUrl=${message.downloadUrl}',
+      );
+
+      // Method 1: Use downloadUrl if available (new backend feature)
+      if (message.downloadUrl != null && message.downloadUrl!.isNotEmpty) {
+        String fullUrl =
+            'http://abusaker.zapto.org:8080${message.downloadUrl!}';
+        AppLogger.i(
+          'CustomChatWidgetNew',
+          'Using downloadUrl from message: $fullUrl',
+        );
+        return fullUrl;
+      }
+
+      // Method 2: Check if content contains a URL (sometimes backend stores URLs in content)
+      if (message.content != null && message.content!.contains('http')) {
+        // Extract URL from content if it's mixed with other text
+        final urlRegex = RegExp(r'https?://[^\s]+');
+        final match = urlRegex.firstMatch(message.content!);
+        if (match != null) {
+          String extractedUrl = match.group(0)!;
+          AppLogger.i(
+            'CustomChatWidgetNew',
+            'Extracted URL from content: $extractedUrl',
+          );
+          return extractedUrl;
+        }
+      }
+
+      // Method 3: Check if attachmentUrl is available and construct proper download URL
+      if (message.attachmentUrl != null && message.attachmentUrl!.isNotEmpty) {
+        String attachmentUrl = message.attachmentUrl!;
+
+        // If it's already a full URL, return it
+        if (attachmentUrl.startsWith('http')) {
+          AppLogger.i(
+            'CustomChatWidgetNew',
+            'Using full attachmentUrl: $attachmentUrl',
+          );
+          return attachmentUrl;
+        }
+
+        // If it's a relative path, construct the full URL
+        String fullUrl = 'http://abusaker.zapto.org:8080$attachmentUrl';
+        AppLogger.i(
+          'CustomChatWidgetNew',
+          'Constructed URL from attachmentUrl: $fullUrl',
+        );
+        return fullUrl;
+      }
+
+      // Method 4: Try to get video URL from chat room data (where correct URLs are stored)
+      if (message.id != null && message.roomId != null) {
+        try {
+          String? roomVideoUrl = await _getVideoUrlFromChatRoomData(message);
+          if (roomVideoUrl != null) {
+            AppLogger.i(
+              'CustomChatWidgetNew',
+              'Found video URL from chat room data: $roomVideoUrl',
+            );
+            return roomVideoUrl;
+          }
+        } catch (e) {
+          AppLogger.w(
+            'CustomChatWidgetNew',
+            'Failed to get video URL from chat room data: $e',
+          );
+        }
+      }
+
+      // Method 5: Try to get video metadata from backend using message ID (fallback)
+      if (message.id != null) {
+        try {
+          String? videoUrl = await _fetchVideoUrlFromBackend(message.id!);
+          if (videoUrl != null) {
+            AppLogger.i(
+              'CustomChatWidgetNew',
+              'Fetched video URL from backend: $videoUrl',
+            );
+            return videoUrl;
+          }
+        } catch (e) {
+          AppLogger.w(
+            'CustomChatWidgetNew',
+            'Failed to fetch video URL from backend: $e',
+          );
+        }
+      }
+
+      AppLogger.w(
+        'CustomChatWidgetNew',
+        'Could not determine video URL for message ${message.id}',
+      );
+      return null;
+    } catch (e) {
+      AppLogger.e('CustomChatWidgetNew', 'Error getting video URL: $e');
+      return null;
+    }
+  }
+
+  // Try to get video URL from chat room data (where correct URLs are stored)
+  Future<String?> _getVideoUrlFromChatRoomData(Message message) async {
+    try {
+      // Access the ChatProvider to get room data
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      final rooms = chatProvider.rooms;
+
+      // Find the room that contains this message
+      final room = rooms.firstWhere(
+        (room) => room.id == message.roomId.toString(),
+        orElse: () => throw Exception('Room not found'),
+      );
+
+      // Check if the room's last message is this video message and has the correct URL
+      final lastMessageData = room.metadata?['lastMessage'];
+      if (lastMessageData != null && lastMessageData is Map) {
+        final lastMessageId = lastMessageData['id'];
+        final lastMessageContent = lastMessageData['content'];
+
+        // If this is the last message and it has a video URL in content
+        if (lastMessageId == message.id &&
+            lastMessageContent != null &&
+            lastMessageContent.toString().contains('http') &&
+            lastMessageContent.toString().contains('.mp4')) {
+          AppLogger.i(
+            'CustomChatWidgetNew',
+            'Found video URL in room last message data: $lastMessageContent',
+          );
+          return lastMessageContent.toString();
+        }
+      }
+
+      return null;
+    } catch (e) {
+      AppLogger.w(
+        'CustomChatWidgetNew',
+        'Error getting video URL from chat room data: $e',
+      );
+      return null;
+    }
+  }
+
+  // Fetch video URL from backend using message ID
+  Future<String?> _fetchVideoUrlFromBackend(int messageId) async {
+    try {
+      // Use the new message-based download endpoint from the backend
+      String downloadUrl =
+          'http://abusaker.zapto.org:8080/api/files/message/$messageId';
+      AppLogger.i(
+        'CustomChatWidgetNew',
+        'Fetched video URL from backend: $downloadUrl',
+      );
+      return downloadUrl;
+    } catch (e) {
+      AppLogger.e(
+        'CustomChatWidgetNew',
+        'Error constructing video URL from backend: $e',
+      );
+      return null;
+    }
+  }
+
+  // Build video error placeholder
+  Widget _buildVideoErrorPlaceholder(Message message, bool isCurrentUser) {
+    return Container(
+      width: double.infinity,
+      height: 180,
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Video icon
+          Icon(Icons.videocam_off, size: 64, color: Colors.grey[500]),
+
+          // Error indicator
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withAlpha(180),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.error_outline, size: 16, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Video unavailable',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Handle image messages that might show as text
+  Widget _buildImageMessageWithLoading(Message message, bool isCurrentUser) {
+    AppLogger.i(
+      'CustomChatWidgetNew',
+      'Building image message with loading: id=${message.id}, contentType=${message.contentType}',
+    );
+
+    final String heroTagId =
+        message.id?.toString() ??
+        DateTime.now().microsecondsSinceEpoch.toString();
+
+    // If content looks like a URL, use it as image URL
+    if (message.content != null &&
+        (message.content!.startsWith('http') ||
+            _isImageUrl(message.content!))) {
+      return ChatImageThumbnail(
+        imageUrl: message.content!,
+        height: 180,
+        width: null,
+        fit: BoxFit.cover,
+        heroTag: 'image-$heroTagId',
+        isCurrentUser: isCurrentUser,
+      );
+    }
+
+    // Otherwise, show a loading placeholder for image
+    return _buildImageLoadingPlaceholder(message, isCurrentUser);
+  }
+
+  // Build video loading placeholder
+  Widget _buildVideoLoadingPlaceholder(Message message, bool isCurrentUser) {
+    return Container(
+      width: double.infinity,
+      height: 180,
+      decoration: BoxDecoration(
+        color: Colors.grey[800],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Shimmer effect
+          _buildShimmerEffect(),
+
+          // Video icon
+          Icon(Icons.videocam, size: 64, color: Colors.grey[500]),
+
+          // Loading indicator
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isCurrentUser
+                            ? Colors.white
+                            : Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Loading video...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build image loading placeholder
+  Widget _buildImageLoadingPlaceholder(Message message, bool isCurrentUser) {
+    return Container(
+      width: double.infinity,
+      height: 180,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Shimmer effect
+          _buildShimmerEffect(),
+
+          // Image icon
+          Icon(Icons.image, size: 64, color: Colors.grey[500]),
+
+          // Loading indicator
+          Positioned(
+            bottom: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.black54,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        isCurrentUser
+                            ? Colors.white
+                            : Theme.of(context).primaryColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Loading image...',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build shimmer effect for loading placeholders
+  Widget _buildShimmerEffect() {
+    return TweenAnimationBuilder<double>(
+      duration: const Duration(milliseconds: 1500),
+      tween: Tween(begin: 0.0, end: 1.0),
+      builder: (context, value, child) {
+        return Container(
+          width: double.infinity,
+          height: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.grey[400]!,
+                Colors.grey[300]!,
+                Colors.grey[200]!,
+                Colors.grey[300]!,
+                Colors.grey[400]!,
+              ],
+              stops: [
+                0.0,
+                0.25 + value * 0.25,
+                0.5 + value * 0.25,
+                0.75 + value * 0.25,
+                1.0,
+              ],
+            ),
+            borderRadius: BorderRadius.circular(12),
+          ),
+        );
+      },
+    );
+  }
+
+  // Check if URL is an image
+  bool _isImageUrl(String url) {
+    final imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
+    final lowerUrl = url.toLowerCase();
+    return imageExtensions.any((ext) => lowerUrl.contains(ext));
+  }
+
   Widget _buildAttachment(
     String url,
     String? contentType, {
@@ -711,10 +1443,13 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       } else if (contentType != null && contentType.startsWith('video/')) {
         AppLogger.i('CustomChatWidgetNew', 'Attempting to render video: $url');
         // Use the VideoThumbnail for videos with hero animation
-        return VideoThumbnail(
-          videoUrl: url,
-          heroTag: 'video-$heroTagId',
-          isCurrentUser: isCurrentUser,
+        return SizedBox(
+          width: 240,
+          child: VideoThumbnail(
+            videoUrl: url,
+            heroTag: 'video-$heroTagId',
+            isCurrentUser: isCurrentUser,
+          ),
         );
       } else {
         // For non-image files - improved design
@@ -1164,7 +1899,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     return Text(
       content,
       style: TextStyle(
-        color: isCurrentUser ? Colors.white : Colors.black87,
+        color:
+            isCurrentUser
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
         fontSize: fontSize,
         fontWeight: fontWeight,
         height:

@@ -3,7 +3,7 @@ import '../models/chat_room.dart';
 import '../models/message.dart';
 import '../presentation/widgets/chat/professional_chat_input.dart';
 import '../presentation/widgets/chat/professional_attachment_menu.dart';
-import '../widgets/enhanced_file_viewer.dart';
+import '../widgets/modern_message_bubble.dart';
 
 class CustomChatWidget extends StatefulWidget {
   final ChatRoom chatRoom;
@@ -64,6 +64,75 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
     });
   }
 
+  bool _shouldShowSenderName(int index) {
+    if (index == 0) return true;
+
+    final currentMessage = widget.messages[index];
+    final previousMessage = widget.messages[index - 1];
+
+    // Show sender name if different from previous message sender
+    return currentMessage.senderId != previousMessage.senderId;
+  }
+
+  void _onMessageTap(Message message) {
+    // Handle message tap (e.g., show details, copy text, etc.)
+    // You can customize this based on your needs
+    // For example: show message details, copy text, etc.
+  }
+
+  void _onMessageLongPress(Message message) {
+    // Handle message long press (e.g., show context menu)
+    _showMessageContextMenu(message);
+  }
+
+  void _showMessageContextMenu(Message message) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder:
+          (context) => Container(
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.copy),
+                  title: const Text('Copy'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Copy message content
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.reply),
+                  title: const Text('Reply'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    // Reply to message
+                  },
+                ),
+                if (message.senderId == widget.currentUserId)
+                  ListTile(
+                    leading: const Icon(Icons.delete, color: Colors.red),
+                    title: const Text(
+                      'Delete',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // Delete message
+                    },
+                  ),
+              ],
+            ),
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
@@ -77,7 +146,23 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
               final message = widget.messages[index];
               final isCurrentUser = message.senderId == widget.currentUserId;
 
-              return _buildMessageItem(message, isCurrentUser);
+              // Determine if we should show sender name (for group chats)
+              final showSenderName = _shouldShowSenderName(index);
+
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: ModernMessageBubble(
+                  message: message,
+                  isCurrentUser: isCurrentUser,
+                  showSenderName:
+                      showSenderName &&
+                      !isCurrentUser &&
+                      widget.showUserAvatars,
+                  showTimestamp: true,
+                  onTap: () => _onMessageTap(message),
+                  onLongPress: () => _onMessageLongPress(message),
+                ),
+              );
             },
           ),
         ),
@@ -121,86 +206,5 @@ class _CustomChatWidgetState extends State<CustomChatWidget> {
       isEnabled: true,
       isUploading: false,
     );
-  }
-
-  Widget _buildMessageItem(Message message, bool isCurrentUser) {
-    return Align(
-      alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 8),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color:
-              isCurrentUser ? Theme.of(context).primaryColor : Colors.grey[300],
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (!isCurrentUser && widget.showUserAvatars)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  message.senderName ?? 'Unknown',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: isCurrentUser ? Colors.white : Colors.black87,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
-            if (message.attachmentUrl != null)
-              _buildAttachment(message.attachmentUrl!, message.contentType),
-            if (message.content != null && message.content!.isNotEmpty)
-              Text(
-                message.content!,
-                style: TextStyle(
-                  color: isCurrentUser ? Colors.white : Colors.black87,
-                ),
-              ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  _formatTime(message.sentAt),
-                  style: TextStyle(
-                    fontSize: 10,
-                    color:
-                        isCurrentUser
-                            ? Colors.white.withAlpha(179)
-                            : Colors.black54,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttachment(String url, String? contentType) {
-    return EnhancedFileViewer(fileUrl: url, contentType: contentType);
-  }
-
-  String _formatTime(DateTime? dateTime) {
-    if (dateTime == null) return '';
-
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-
-    if (messageDate == today) {
-      return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    } else if (messageDate == yesterday) {
-      return 'Yesterday ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    } else {
-      return '${dateTime.day}/${dateTime.month}/${dateTime.year} ${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    }
   }
 }

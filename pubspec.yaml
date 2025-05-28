@@ -56,7 +56,7 @@ dependencies:
   equatable: ^2.0.7
   flutter_bloc: ^9.1.1
   bloc: ^9.0.0
-  get_it: ^8.0.3
+  get_it: ^7.7.0
   google_fonts: ^6.1.0
   fl_chart: ^0.66.2
   path: ^1.8.3
@@ -92,6 +92,8 @@ dev_dependencies:
   build_runner: ^2.4.8
   # App icon generator
   flutter_launcher_icons: ^0.13.1
+  # MSI installer generator
+  msix: ^3.16.8
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 # The following section is specific to Flutter packages.
@@ -144,3 +146,21 @@ flutter_launcher_icons:
     generate: true
     image_path: "assets/icons/icon.jpg"
     icon_size: 48 # min:48, max:256, default: 48
+
+# MSIX configuration for Windows installer
+msix_config:
+  display_name: Vector Chat
+  publisher_display_name: Vector Team
+  identity_name: com.vector.chat
+  msix_version: 1.0.0.0
+  description: Vector - Modern Chat Application for Windows
+  publisher: CN=Vector Team
+  logo_path: assets/icons/icon.jpg
+  start_menu_icon_path: assets/icons/icon.jpg
+  tile_icon_path: assets/icons/icon.jpg
+  icons_background_color: transparent
+  architecture: x64
+  capabilities: 'internetClient,microphone,webcam,picturesLibrary,videosLibrary,documentsLibrary'
+  languages: en-us
+  store: false
+  install_certificate: false

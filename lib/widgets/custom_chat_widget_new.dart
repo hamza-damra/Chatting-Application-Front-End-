@@ -17,6 +17,7 @@ import '../screens/file_viewers/text_file_viewer_screen.dart';
 import '../widgets/blocking_aware_chat_input.dart';
 import 'chat_image_thumbnail.dart';
 import 'video_player_widget.dart';
+import 'scroll_to_bottom_button.dart';
 
 import '../custom_routes.dart';
 
@@ -55,8 +56,15 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
   bool _isUploading = false;
   double _uploadProgress = 0.0;
   String _currentFileName = '';
+  String _actualFileName = '';
   ProfessionalFileUploadHandler? _fileUploadHandler;
   MessagePaginationProvider? _paginationProvider;
+
+  // Scroll position tracking for "move to new messages" button
+  bool _showScrollToBottomButton = false;
+  bool _isNearBottom = true;
+  static const double _bottomThreshold =
+      100.0; // Distance from bottom to consider "near bottom"
 
   @override
   void initState() {
@@ -159,15 +167,24 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       }
     }
 
-    // Only scroll to bottom if we actually added new messages
+    // Handle new messages based on scroll position
     if (hasNewMessages) {
       AppLogger.i(
         'CustomChatWidgetNew',
-        'New messages added, scrolling to bottom',
+        'New messages added, isNearBottom: $_isNearBottom',
       );
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollToBottom();
-      });
+
+      // If user is near bottom, auto-scroll to new messages
+      if (_isNearBottom) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToBottom();
+        });
+      } else {
+        // If user is not near bottom, show the scroll-to-bottom button
+        setState(() {
+          _showScrollToBottomButton = true;
+        });
+      }
     }
   }
 
@@ -214,7 +231,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     );
   }
 
-  /// Handle scroll events for pagination
+  /// Handle scroll events for pagination and scroll button visibility
   void _onScroll() {
     if (!_scrollController.hasClients || _paginationProvider == null) return;
 
@@ -231,6 +248,27 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
         _paginationProvider!.loadMoreMessages(size: widget.pageSize);
       }
     }
+
+    // Track scroll position for "move to new messages" button
+    // In a reversed ListView, position 0 is the bottom (newest messages)
+    final position = _scrollController.position;
+    final wasNearBottom = _isNearBottom;
+    _isNearBottom = position.pixels <= _bottomThreshold;
+
+    // Show/hide scroll to bottom button based on scroll position
+    final shouldShowButton = !_isNearBottom;
+    if (_showScrollToBottomButton != shouldShowButton) {
+      setState(() {
+        _showScrollToBottomButton = shouldShowButton;
+      });
+    }
+
+    // If we just scrolled to the bottom, hide the button
+    if (_isNearBottom && !wasNearBottom && _showScrollToBottomButton) {
+      setState(() {
+        _showScrollToBottomButton = false;
+      });
+    }
   }
 
   @override
@@ -245,7 +283,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       );
 
       if (_paginationProvider != null) {
+        // Reset pagination state (this clears messages immediately)
         _paginationProvider!.reset();
+
+        // Load new messages for the new room
         _paginationProvider!.loadMessages(widget.roomId, size: widget.pageSize);
       }
     }
@@ -277,12 +318,28 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     }
   }
 
+  /// Handle scroll-to-bottom button press
+  void _onScrollToBottomPressed() {
+    _scrollToBottom();
+    // Hide the button immediately when pressed
+    setState(() {
+      _showScrollToBottomButton = false;
+    });
+  }
+
   void _sendMessage() {
     final message = _messageController.text.trim();
     if (message.isNotEmpty) {
       // Send message through the original handler
       widget.onSendMessage(message);
       _messageController.clear();
+
+      // Hide scroll to bottom button when user sends a message
+      if (_showScrollToBottomButton) {
+        setState(() {
+          _showScrollToBottomButton = false;
+        });
+      }
 
       // The message will be added to pagination provider through WebSocket integration
       // Just scroll to bottom
@@ -298,16 +355,11 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     });
   }
 
-  void _handleProgress(double progress) {
-    setState(() {
-      _uploadProgress = progress;
-    });
-  }
-
   void _handleUploadError(String error) {
     setState(() {
       _isUploading = false;
       _uploadProgress = 0.0;
+      _actualFileName = '';
     });
 
     // Create a more user-friendly error message
@@ -355,21 +407,37 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     setState(() {
       _isUploading = true;
       _currentFileName = 'image';
+      _actualFileName = 'Selecting image...';
       _isAttachmentMenuOpen = false;
+      _uploadProgress = 0.0;
     });
 
     try {
       await _fileUploadHandler!.pickAndUploadImage(
-        onProgress: _handleProgress,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+            if (progress < 0.1) {
+              _actualFileName = 'Preparing image...';
+            } else if (progress < 1.0) {
+              _actualFileName = 'Uploading image...';
+            } else {
+              _actualFileName = 'Upload complete!';
+            }
+          });
+        },
         onComplete: () {
           setState(() {
             _isUploading = false;
             _uploadProgress = 0.0;
+            _actualFileName = '';
           });
           // The file upload handler already sends the message via WebSocket
           _scrollToBottom();
         },
-        onError: _handleUploadError,
+        onError: (error) {
+          _handleUploadError(error);
+        },
       );
     } catch (e) {
       AppLogger.e('CustomChatWidgetNew', 'Error uploading image: $e');
@@ -383,20 +451,36 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     setState(() {
       _isUploading = true;
       _currentFileName = 'video';
+      _actualFileName = 'Selecting video...';
       _isAttachmentMenuOpen = false;
+      _uploadProgress = 0.0;
     });
 
     try {
       await _fileUploadHandler!.pickAndUploadVideo(
-        onProgress: _handleProgress,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+            if (progress < 0.1) {
+              _actualFileName = 'Preparing video...';
+            } else if (progress < 1.0) {
+              _actualFileName = 'Uploading video...';
+            } else {
+              _actualFileName = 'Upload complete!';
+            }
+          });
+        },
         onComplete: () {
           setState(() {
             _isUploading = false;
             _uploadProgress = 0.0;
+            _actualFileName = '';
           });
           _scrollToBottom();
         },
-        onError: _handleUploadError,
+        onError: (error) {
+          _handleUploadError(error);
+        },
       );
     } catch (e) {
       AppLogger.e('CustomChatWidgetNew', 'Error uploading video: $e');
@@ -410,20 +494,36 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     setState(() {
       _isUploading = true;
       _currentFileName = 'document';
+      _actualFileName = 'Selecting document...';
       _isAttachmentMenuOpen = false;
+      _uploadProgress = 0.0;
     });
 
     try {
       await _fileUploadHandler!.pickAndUploadDocument(
-        onProgress: _handleProgress,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+            if (progress < 0.1) {
+              _actualFileName = 'Preparing document...';
+            } else if (progress < 1.0) {
+              _actualFileName = 'Uploading document...';
+            } else {
+              _actualFileName = 'Upload complete!';
+            }
+          });
+        },
         onComplete: () {
           setState(() {
             _isUploading = false;
             _uploadProgress = 0.0;
+            _actualFileName = '';
           });
           _scrollToBottom();
         },
-        onError: _handleUploadError,
+        onError: (error) {
+          _handleUploadError(error);
+        },
       );
     } catch (e) {
       AppLogger.e('CustomChatWidgetNew', 'Error uploading document: $e');
@@ -437,20 +537,36 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     setState(() {
       _isUploading = true;
       _currentFileName = 'camera';
+      _actualFileName = 'Taking photo...';
       _isAttachmentMenuOpen = false;
+      _uploadProgress = 0.0;
     });
 
     try {
       await _fileUploadHandler!.captureAndUploadImage(
-        onProgress: _handleProgress,
+        onProgress: (progress) {
+          setState(() {
+            _uploadProgress = progress;
+            if (progress < 0.1) {
+              _actualFileName = 'Preparing photo...';
+            } else if (progress < 1.0) {
+              _actualFileName = 'Uploading photo...';
+            } else {
+              _actualFileName = 'Upload complete!';
+            }
+          });
+        },
         onComplete: () {
           setState(() {
             _isUploading = false;
             _uploadProgress = 0.0;
+            _actualFileName = '';
           });
           _scrollToBottom();
         },
-        onError: _handleUploadError,
+        onError: (error) {
+          _handleUploadError(error);
+        },
       );
     } catch (e) {
       AppLogger.e('CustomChatWidgetNew', 'Error uploading camera image: $e');
@@ -464,7 +580,23 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       builder: (context, paginationProvider, child) {
         return Column(
           children: [
-            Expanded(child: _buildMessagesList(paginationProvider)),
+            Expanded(
+              child: Stack(
+                children: [
+                  _buildMessagesList(paginationProvider),
+                  // Scroll to bottom button
+                  if (_showScrollToBottomButton)
+                    Positioned(
+                      bottom: 16,
+                      right: 16,
+                      child: ScrollToBottomButton(
+                        onPressed: _onScrollToBottomPressed,
+                        hasUnreadMessages: true,
+                      ),
+                    ),
+                ],
+              ),
+            ),
             if (_isUploading) _buildProgressIndicator(),
             if (_isAttachmentMenuOpen) _buildProfessionalAttachmentMenu(),
             _buildChatInput(),
@@ -577,54 +709,183 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
   }
 
   Widget _buildProgressIndicator() {
-    return Padding(
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
       padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).colorScheme.shadow.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(
-                  'Uploading $_currentFileName',
-                  style: const TextStyle(fontSize: 14),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  _getFileIcon(_currentFileName),
+                  size: 20,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
-              Text(
-                '${(_uploadProgress * 100).toStringAsFixed(0)}%',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Uploading ${_actualFileName.isNotEmpty ? _actualFileName : _getFileDisplayName(_currentFileName)}',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Please wait while your file is being uploaded...',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${(_uploadProgress * 100).toStringAsFixed(0)}%',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          LinearProgressIndicator(
-            value: _uploadProgress,
-            backgroundColor: Colors.grey[300],
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Theme.of(context).primaryColor,
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: LinearProgressIndicator(
+              value: _uploadProgress,
+              backgroundColor:
+                  Theme.of(context).colorScheme.surfaceContainerHighest,
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
+              ),
+              minHeight: 6,
             ),
           ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () {
-                widget.webSocketService.cancelUpload();
-                setState(() {
-                  _isUploading = false;
-                });
-              },
-              child: const Text('Cancel'),
-            ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _getUploadStatusText(),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.6),
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () {
+                  widget.webSocketService.cancelUpload();
+                  setState(() {
+                    _isUploading = false;
+                    _uploadProgress = 0.0;
+                    _actualFileName = '';
+                  });
+                },
+                icon: const Icon(Icons.close, size: 16),
+                label: const Text('Cancel'),
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  IconData _getFileIcon(String fileName) {
+    switch (fileName.toLowerCase()) {
+      case 'image':
+        return Icons.image_outlined;
+      case 'video':
+        return Icons.videocam_outlined;
+      case 'document':
+        return Icons.description_outlined;
+      case 'camera':
+        return Icons.camera_alt_outlined;
+      default:
+        return Icons.attach_file_outlined;
+    }
+  }
+
+  String _getFileDisplayName(String fileName) {
+    switch (fileName.toLowerCase()) {
+      case 'image':
+        return 'Image';
+      case 'video':
+        return 'Video';
+      case 'document':
+        return 'Document';
+      case 'camera':
+        return 'Photo';
+      default:
+        return 'File';
+    }
+  }
+
+  String _getUploadStatusText() {
+    final progress = (_uploadProgress * 100).toInt();
+    if (progress == 0) {
+      return 'Starting upload...';
+    } else if (progress < 10) {
+      return 'Connecting to server...';
+    } else if (progress < 50) {
+      return 'Uploading to server...';
+    } else if (progress < 90) {
+      return 'Processing file...';
+    } else if (progress < 100) {
+      return 'Almost done...';
+    } else {
+      return 'Upload complete!';
+    }
   }
 
   Widget _buildProfessionalAttachmentMenu() {

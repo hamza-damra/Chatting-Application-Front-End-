@@ -73,13 +73,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
         elevation: 0,
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadParticipants,
-            tooltip: 'Refresh participants',
-          ),
-        ],
+        actions: [],
       ),
       body: RefreshIndicator(
         onRefresh: _loadParticipants,

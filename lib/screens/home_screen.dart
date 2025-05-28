@@ -6,6 +6,7 @@ import '../providers/chat_provider.dart';
 import '../services/improved_file_upload_service.dart';
 import '../services/screen_state_manager.dart';
 import '../widgets/search_chat_delegate.dart';
+import '../widgets/modern_bottom_navigation.dart';
 import 'chat/create_group_screen.dart';
 import 'chat/create_private_chat_screen.dart';
 import 'chat/group_chat_list.dart';
@@ -62,7 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final webSocketService = Provider.of<ImprovedFileUploadService>(
       context,
@@ -111,34 +111,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 );
               },
             ),
-          if (_currentIndex < 2)
-            IconButton(
-              icon: const Icon(Icons.refresh),
-              tooltip: 'Refresh chat rooms',
-              onPressed: () async {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                try {
-                  await chatProvider.refreshRooms();
-                  if (!mounted) return;
-                  scaffoldMessenger.showSnackBar(
-                    const SnackBar(content: Text('Chat rooms refreshed')),
-                  );
-                } catch (e) {
-                  if (!mounted) return;
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(
-                      content: Text('Error refreshing: $e'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              },
-            ),
         ],
       ),
       body: screens[_currentIndex],
       floatingActionButton: _currentIndex < 2 ? _buildSpeedDial() : null,
-      bottomNavigationBar: BottomNavigationBar(
+      bottomNavigationBar: ModernBottomNavigation(
         currentIndex: _currentIndex,
         onTap: (i) {
           setState(() {
@@ -152,28 +129,25 @@ class _HomeScreenState extends State<HomeScreen> {
           });
           _updateScreenState();
         },
-        type: BottomNavigationBarType.fixed,
-        selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.chat_outlined),
-            activeIcon: Icon(Icons.chat),
+          ModernBottomNavItem(
+            icon: Icons.chat_bubble_outline_rounded,
+            activeIcon: Icons.chat_bubble_rounded,
             label: 'Chats',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.group_outlined),
-            activeIcon: Icon(Icons.group),
+          ModernBottomNavItem(
+            icon: Icons.groups_outlined,
+            activeIcon: Icons.groups_rounded,
             label: 'Groups',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.person_outlined),
-            activeIcon: Icon(Icons.person),
+          ModernBottomNavItem(
+            icon: Icons.person_outline_rounded,
+            activeIcon: Icons.person_rounded,
             label: 'Profile',
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            activeIcon: Icon(Icons.settings),
+          ModernBottomNavItem(
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
             label: 'Settings',
           ),
         ],
@@ -184,21 +158,42 @@ class _HomeScreenState extends State<HomeScreen> {
   SpeedDial _buildSpeedDial() {
     final theme = Theme.of(context);
     return SpeedDial(
-      icon: Icons.add,
-      activeIcon: Icons.close,
-      backgroundColor: theme.colorScheme.primaryContainer,
-      foregroundColor: theme.colorScheme.onPrimaryContainer,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      overlayOpacity: 0.4,
+      icon: Icons.add_rounded,
+      activeIcon: Icons.close_rounded,
+      backgroundColor: theme.colorScheme.primary,
+      foregroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      overlayOpacity: 0.5,
+      elevation: 8,
+      animationCurve: Curves.easeInOut,
+      animationDuration: const Duration(milliseconds: 300),
       children: [
         SpeedDialChild(
-          child: const Icon(Icons.person),
+          child: const Icon(Icons.person_add_rounded, color: Colors.white),
           label: 'New Chat',
+          backgroundColor: theme.colorScheme.primary,
+          labelBackgroundColor: theme.colorScheme.surface,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           onTap: () => _goToCreatePrivateChat(),
         ),
         SpeedDialChild(
-          child: const Icon(Icons.group),
+          child: const Icon(Icons.group_add_rounded, color: Colors.white),
           label: 'New Group',
+          backgroundColor: theme.colorScheme.primary,
+          labelBackgroundColor: theme.colorScheme.surface,
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           onTap: () => _goToCreateGroupChat(),
         ),
       ],

@@ -150,14 +150,23 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: Colors.white,
         selectedItemColor: primaryColor,
         unselectedItemColor: lightSecondaryTextColor,
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 12,
         showSelectedLabels: true,
         showUnselectedLabels: true,
+        selectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+        landscapeLayout: BottomNavigationBarLandscapeLayout.centered,
       ),
     );
   }
@@ -278,14 +287,23 @@ class AppTheme {
         thickness: 1,
         space: 1,
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: darkSurfaceColor,
         selectedItemColor: accentColor,
         unselectedItemColor: darkSecondaryTextColor,
         type: BottomNavigationBarType.fixed,
-        elevation: 8,
+        elevation: 12,
         showSelectedLabels: true,
         showUnselectedLabels: true,
+        selectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.poppins(
+          fontSize: 11,
+          fontWeight: FontWeight.w500,
+        ),
+        landscapeLayout: BottomNavigationBarLandscapeLayout.centered,
       ),
     );
   }

@@ -465,7 +465,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       appBar: AppBar(
         title: Text(widget.chatRoom.name ?? 'Chat'),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadMessages),
           if (isGroupChat)
             IconButton(
               icon: const Icon(Icons.more_vert),

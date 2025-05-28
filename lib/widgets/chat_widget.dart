@@ -3,6 +3,7 @@ import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import 'animated_message_bubble.dart';
+import 'scroll_to_bottom_button.dart';
 
 class ChatWidget extends StatefulWidget {
   final List<types.Message> messages;
@@ -30,17 +31,64 @@ class _ChatWidgetState extends State<ChatWidget> with WidgetsBindingObserver {
   final ScrollController _scrollController = ScrollController();
   bool _keyboardVisible = false;
 
+  // Scroll position tracking for "move to new messages" button
+  bool _showScrollToBottomButton = false;
+  bool _isNearBottom = true;
+  static const double _bottomThreshold = 100.0;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(ChatWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    // Check if new messages were added
+    if (widget.messages.length > oldWidget.messages.length) {
+      // If user is not near bottom when new messages arrive, show the button
+      if (!_isNearBottom && !_showScrollToBottomButton) {
+        setState(() {
+          _showScrollToBottomButton = true;
+        });
+      }
+    }
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+
+    // Track scroll position for "move to new messages" button
+    // In a reversed ListView, position 0 is the bottom (newest messages)
+    final position = _scrollController.position;
+    final wasNearBottom = _isNearBottom;
+    _isNearBottom = position.pixels <= _bottomThreshold;
+
+    // Show/hide scroll to bottom button based on scroll position
+    final shouldShowButton = !_isNearBottom;
+    if (_showScrollToBottomButton != shouldShowButton) {
+      setState(() {
+        _showScrollToBottomButton = shouldShowButton;
+      });
+    }
+
+    // If we just scrolled to the bottom, hide the button
+    if (_isNearBottom && !wasNearBottom && _showScrollToBottomButton) {
+      setState(() {
+        _showScrollToBottomButton = false;
+      });
+    }
   }
 
   @override
@@ -63,6 +111,39 @@ class _ChatWidgetState extends State<ChatWidget> with WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  /// Scroll to bottom of the chat
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      try {
+        _scrollController.animateTo(
+          0.0, // In a reversed ListView, 0 is the bottom
+          duration: const Duration(milliseconds: 450),
+          curve: Curves.easeOutCubic,
+        );
+      } catch (e) {
+        // If there's an error, try again with a delay
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (_scrollController.hasClients) {
+            _scrollController.animateTo(
+              0.0,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOut,
+            );
+          }
+        });
+      }
+    }
+  }
+
+  /// Handle scroll-to-bottom button press
+  void _onScrollToBottomPressed() {
+    _scrollToBottom();
+    // Hide the button immediately when pressed
+    setState(() {
+      _showScrollToBottomButton = false;
+    });
   }
 
   Widget _buildMessage(types.Message message) {
@@ -143,6 +224,23 @@ class _ChatWidgetState extends State<ChatWidget> with WidgetsBindingObserver {
             );
           },
         ),
+
+        // Scroll to bottom button
+        if (_showScrollToBottomButton &&
+            !widget.isAttachmentUploading &&
+            !isLoading)
+          Positioned(
+            bottom:
+                _keyboardVisible
+                    ? MediaQuery.of(context).viewInsets.bottom + 16
+                    : 16,
+            right: 16,
+            child: ScrollToBottomButton(
+              onPressed: _onScrollToBottomPressed,
+              hasUnreadMessages: true,
+            ),
+          ),
+
         if (widget.isAttachmentUploading)
           Container(
             color: Colors.black.withAlpha(76),

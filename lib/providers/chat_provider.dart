@@ -61,12 +61,40 @@ class ChatProvider with ChangeNotifier {
     // Use calculated unread count based on actual message statuses
     final unreadCount = getUnreadCount(room.id);
 
+    // Extract last message sender name safely
+    String? lastMessageSender;
+    final senderData = room.metadata?['lastMessageSender'];
+    if (senderData != null) {
+      if (senderData is String) {
+        lastMessageSender = senderData;
+      } else if (senderData is Map<String, dynamic>) {
+        lastMessageSender =
+            senderData['fullName'] ??
+            senderData['name'] ??
+            senderData['username'] ??
+            'Unknown User';
+      }
+    }
+
+    // Extract last message content safely
+    String? lastMessage;
+    final messageData = room.metadata?['lastMessage'];
+    if (messageData != null) {
+      if (messageData is String) {
+        lastMessage = messageData;
+      } else if (messageData is Map<String, dynamic>) {
+        lastMessage = messageData['content'] as String?;
+      }
+    }
+
     return ChatRoom(
       id: int.parse(room.id),
       name: room.name,
       description: room.metadata?['description'] as String?,
       isPrivate: room.type == types.RoomType.direct,
       lastMessageId: null, // Not available in types.Room
+      lastMessage: lastMessage,
+      lastMessageSender: lastMessageSender,
       lastActivity:
           room.metadata?['lastMessageTime'] != null
               ? DateTime.tryParse(room.metadata!['lastMessageTime'] as String)
@@ -81,12 +109,40 @@ class ChatProvider with ChangeNotifier {
     // Use calculated unread count based on actual message statuses
     final unreadCount = getUnreadCount(room.id);
 
+    // Extract last message sender name safely
+    String? lastMessageSender;
+    final senderData = room.metadata?['lastMessageSender'];
+    if (senderData != null) {
+      if (senderData is String) {
+        lastMessageSender = senderData;
+      } else if (senderData is Map<String, dynamic>) {
+        lastMessageSender =
+            senderData['fullName'] ??
+            senderData['name'] ??
+            senderData['username'] ??
+            'Unknown User';
+      }
+    }
+
+    // Extract last message content safely
+    String? lastMessage;
+    final messageData = room.metadata?['lastMessage'];
+    if (messageData != null) {
+      if (messageData is String) {
+        lastMessage = messageData;
+      } else if (messageData is Map<String, dynamic>) {
+        lastMessage = messageData['content'] as String?;
+      }
+    }
+
     return ChatRoom(
       id: int.parse(room.id),
       name: room.name ?? '',
       description: room.metadata?['description'] as String?,
       isPrivate: room.type == types.RoomType.direct,
       lastMessageId: null,
+      lastMessage: lastMessage,
+      lastMessageSender: lastMessageSender,
       lastActivity:
           room.metadata?['lastMessageTime'] != null
               ? DateTime.tryParse(room.metadata!['lastMessageTime'] as String)
@@ -99,6 +155,7 @@ class ChatProvider with ChangeNotifier {
   // Return private chat rooms (direct chats)
   Future<List<ChatRoom>> getPrivateChatRooms() async {
     try {
+      AppLogger.d('ChatProvider', 'Loading private chat rooms...');
       // Force refresh from server to get latest data
       await _loadRooms();
 
@@ -107,6 +164,26 @@ class ChatProvider with ChangeNotifier {
           _rooms.where((room) {
             return room.type == types.RoomType.direct;
           }).toList();
+
+      AppLogger.d('ChatProvider', 'Found ${privateRooms.length} private rooms');
+
+      // Debug each room's metadata
+      for (final room in privateRooms) {
+        AppLogger.d(
+          'ChatProvider',
+          'Room ${room.id} metadata: ${room.metadata}',
+        );
+        if (room.metadata?['lastMessageSender'] != null) {
+          AppLogger.d(
+            'ChatProvider',
+            'Room ${room.id} lastMessageSender type: ${room.metadata!['lastMessageSender'].runtimeType}',
+          );
+          AppLogger.d(
+            'ChatProvider',
+            'Room ${room.id} lastMessageSender value: ${room.metadata!['lastMessageSender']}',
+          );
+        }
+      }
 
       // Convert types.Room to ChatRoom model
       return privateRooms.map(_convertTypesRoomToChatRoom).toList();
@@ -911,7 +988,24 @@ class ChatProvider with ChangeNotifier {
         unsubscribeFromRoom(_selectedRoom!.id);
       }
 
+      // Set loading state before changing room to prevent flash of old content
+      _isLoading = true;
+
+      // Clear messages for the previous room to prevent showing old content
+      if (_selectedRoom != null && _selectedRoom!.id != room.id) {
+        final previousRoomId = _selectedRoom!.id;
+        AppLogger.i(
+          'ChatProvider',
+          'Clearing messages for previous room $previousRoomId to prevent content flash',
+        );
+        // Temporarily clear the messages to prevent flash
+        _messages[previousRoomId] = [];
+      }
+
       _selectedRoom = room;
+
+      // Notify listeners immediately to show loading state
+      notifyListeners();
 
       // Make sure the room exists in our list
       final existingRoom = _rooms.firstWhere(
@@ -954,13 +1048,16 @@ class ChatProvider with ChangeNotifier {
       // Mark messages as read when selecting a room (async, non-blocking)
       markMessagesAsRead(existingRoom.id);
 
+      // Final notification after everything is loaded
       notifyListeners();
       AppLogger.i(
         'ChatProvider',
         'Room selection completed for room ${existingRoom.id}',
       );
     } catch (e) {
+      _isLoading = false;
       AppLogger.e('ChatProvider', 'Error in selectRoom: $e');
+      notifyListeners();
       rethrow;
     }
   }

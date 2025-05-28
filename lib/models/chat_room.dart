@@ -4,6 +4,8 @@ class ChatRoom {
   final String? description;
   final bool isPrivate;
   final int? lastMessageId;
+  final String? lastMessage;
+  final String? lastMessageSender;
   final DateTime? lastActivity;
   final int unreadCount;
   final List<int> participantIds;
@@ -14,18 +16,50 @@ class ChatRoom {
     this.description,
     required this.isPrivate,
     this.lastMessageId,
+    this.lastMessage,
+    this.lastMessageSender,
     this.lastActivity,
     this.unreadCount = 0,
     required this.participantIds,
   });
 
   factory ChatRoom.fromJson(Map<String, dynamic> json) {
+    // Extract last message sender name
+    String? lastMessageSender;
+    if (json['lastMessageSender'] != null) {
+      if (json['lastMessageSender'] is String) {
+        // If it's already a string, use it directly
+        lastMessageSender = json['lastMessageSender'] as String;
+      } else if (json['lastMessageSender'] is Map<String, dynamic>) {
+        // If it's a user object, extract the name
+        final senderObj = json['lastMessageSender'] as Map<String, dynamic>;
+        lastMessageSender =
+            senderObj['fullName'] ??
+            senderObj['name'] ??
+            senderObj['username'] ??
+            'Unknown User';
+      }
+    }
+
+    // Extract last message content safely
+    String? lastMessage;
+    if (json['lastMessage'] != null) {
+      if (json['lastMessage'] is String) {
+        lastMessage = json['lastMessage'] as String;
+      } else if (json['lastMessage'] is Map<String, dynamic>) {
+        final messageObj = json['lastMessage'] as Map<String, dynamic>;
+        lastMessage = messageObj['content'] as String?;
+      }
+    }
+
     return ChatRoom(
       id: json['id'] as int,
       name: json['name'] as String?,
       description: json['description'] as String?,
       isPrivate: json['isPrivate'] as bool? ?? false,
       lastMessageId: json['lastMessageId'] as int?,
+      lastMessage: lastMessage,
+      lastMessageSender: lastMessageSender,
       lastActivity:
           json['lastActivity'] != null
               ? DateTime.parse(json['lastActivity'] as String)
@@ -46,6 +80,8 @@ class ChatRoom {
       'description': description,
       'isPrivate': isPrivate,
       'lastMessageId': lastMessageId,
+      'lastMessage': lastMessage,
+      'lastMessageSender': lastMessageSender,
       'lastActivity': lastActivity?.toIso8601String(),
       'unreadCount': unreadCount,
       'participantIds': participantIds,

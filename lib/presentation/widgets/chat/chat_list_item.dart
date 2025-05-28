@@ -136,7 +136,7 @@ class ChatListItem extends StatelessWidget {
                               // Last message
                               Expanded(
                                 child: Text(
-                                  chatRoom.lastMessage ?? 'No messages yet',
+                                  _getLastMessageDisplay(chatRoom, isGroup),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     fontSize: 15,
                                     color:
@@ -361,6 +361,25 @@ class ChatListItem extends StatelessWidget {
           ),
       ],
     );
+  }
+
+  String _getLastMessageDisplay(ChatRoomModel chatRoom, bool isGroup) {
+    final lastMessage = chatRoom.lastMessage;
+    final lastMessageSender = chatRoom.lastMessageSender;
+
+    if (lastMessage != null && lastMessage.isNotEmpty) {
+      if (isGroup &&
+          lastMessageSender != null &&
+          lastMessageSender.isNotEmpty) {
+        // For group chats, show "SenderName: message"
+        return '$lastMessageSender: $lastMessage';
+      } else {
+        // For private chats, just show the message content
+        return lastMessage;
+      }
+    }
+
+    return 'No messages yet';
   }
 
   String _formatTimestamp(DateTime timestamp) {

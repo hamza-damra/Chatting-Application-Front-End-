@@ -597,6 +597,56 @@ class ApiChatService {
       // Extract unread count if available
       final unreadCount = data['unreadCount'] ?? 0;
 
+      // Extract last message sender name
+      String? lastMessageSender;
+      if (data['lastMessageSender'] != null) {
+        AppLogger.d(
+          'ApiChatService',
+          'lastMessageSender type: ${data['lastMessageSender'].runtimeType}',
+        );
+        AppLogger.d(
+          'ApiChatService',
+          'lastMessageSender value: ${data['lastMessageSender']}',
+        );
+
+        if (data['lastMessageSender'] is String) {
+          // If it's already a string, use it directly
+          lastMessageSender = data['lastMessageSender'] as String;
+          AppLogger.d(
+            'ApiChatService',
+            'Using string lastMessageSender: $lastMessageSender',
+          );
+        } else if (data['lastMessageSender'] is Map<String, dynamic>) {
+          // If it's a user object, extract the name
+          final senderObj = data['lastMessageSender'] as Map<String, dynamic>;
+          lastMessageSender =
+              senderObj['fullName'] ??
+              senderObj['name'] ??
+              senderObj['username'] ??
+              'Unknown User';
+          AppLogger.d(
+            'ApiChatService',
+            'Extracted lastMessageSender from object: $lastMessageSender',
+          );
+        } else {
+          AppLogger.w(
+            'ApiChatService',
+            'Unexpected lastMessageSender type: ${data['lastMessageSender'].runtimeType}',
+          );
+        }
+      }
+
+      // Extract last message content safely
+      String? lastMessage;
+      if (data.containsKey('lastMessage') && data['lastMessage'] != null) {
+        if (data['lastMessage'] is String) {
+          lastMessage = data['lastMessage'] as String;
+        } else if (data['lastMessage'] is Map<String, dynamic>) {
+          final messageObj = data['lastMessage'] as Map<String, dynamic>;
+          lastMessage = messageObj['content'] as String?;
+        }
+      }
+
       return types.Room(
         id: data['id'].toString(),
         type: isPrivate ? types.RoomType.direct : types.RoomType.group,
@@ -607,7 +657,8 @@ class ApiChatService {
         updatedAt: updatedAt,
         metadata: {
           'unreadCount': unreadCount,
-          'lastMessage': data['lastMessage'],
+          'lastMessage': lastMessage,
+          'lastMessageSender': lastMessageSender,
           'lastMessageTime': data['lastMessageTime'],
         },
       );

@@ -10,6 +10,7 @@ class ChatRoomModel extends Equatable {
   final List<UserModel> participants;
   final UserModel? creator;
   final String? lastMessage;
+  final String? lastMessageSender;
   final DateTime? lastMessageTime;
   final int unreadCount;
   final DateTime createdAt;
@@ -22,6 +23,7 @@ class ChatRoomModel extends Equatable {
     required this.participants,
     this.creator,
     this.lastMessage,
+    this.lastMessageSender,
     this.lastMessageTime,
     this.unreadCount = 0,
     required this.createdAt,
@@ -35,6 +37,7 @@ class ChatRoomModel extends Equatable {
     List<UserModel>? participants,
     UserModel? creator,
     String? lastMessage,
+    String? lastMessageSender,
     DateTime? lastMessageTime,
     int? unreadCount,
     DateTime? createdAt,
@@ -47,6 +50,7 @@ class ChatRoomModel extends Equatable {
       participants: participants ?? this.participants,
       creator: creator ?? this.creator,
       lastMessage: lastMessage ?? this.lastMessage,
+      lastMessageSender: lastMessageSender ?? this.lastMessageSender,
       lastMessageTime: lastMessageTime ?? this.lastMessageTime,
       unreadCount: unreadCount ?? this.unreadCount,
       createdAt: createdAt ?? this.createdAt,
@@ -62,6 +66,7 @@ class ChatRoomModel extends Equatable {
       'participants': participants.map((p) => p.toMap()).toList(),
       'creator': creator?.toMap(),
       'lastMessage': lastMessage,
+      'lastMessageSender': lastMessageSender,
       'lastMessageTime': lastMessageTime?.toIso8601String(),
       'unreadCount': unreadCount,
       'createdAt': createdAt.toIso8601String(),
@@ -70,6 +75,34 @@ class ChatRoomModel extends Equatable {
   }
 
   factory ChatRoomModel.fromMap(Map<String, dynamic> map) {
+    // Extract last message sender name
+    String? lastMessageSender;
+    if (map['lastMessageSender'] != null) {
+      if (map['lastMessageSender'] is String) {
+        // If it's already a string, use it directly
+        lastMessageSender = map['lastMessageSender'] as String;
+      } else if (map['lastMessageSender'] is Map<String, dynamic>) {
+        // If it's a user object, extract the name
+        final senderObj = map['lastMessageSender'] as Map<String, dynamic>;
+        lastMessageSender =
+            senderObj['fullName'] ??
+            senderObj['name'] ??
+            senderObj['username'] ??
+            'Unknown User';
+      }
+    }
+
+    // Extract last message content safely
+    String? lastMessage;
+    if (map['lastMessage'] != null) {
+      if (map['lastMessage'] is String) {
+        lastMessage = map['lastMessage'] as String;
+      } else if (map['lastMessage'] is Map<String, dynamic>) {
+        final messageObj = map['lastMessage'] as Map<String, dynamic>;
+        lastMessage = messageObj['content'] as String?;
+      }
+    }
+
     return ChatRoomModel(
       id: map['id'].toString(),
       name: map['name'],
@@ -79,7 +112,8 @@ class ChatRoomModel extends Equatable {
       ),
       creator:
           map['creator'] != null ? UserModel.fromMap(map['creator']) : null,
-      lastMessage: map['lastMessage'],
+      lastMessage: lastMessage,
+      lastMessageSender: lastMessageSender,
       lastMessageTime:
           map['lastMessageTime'] != null
               ? DateTime.parse(map['lastMessageTime'])
@@ -170,6 +204,7 @@ class ChatRoomModel extends Equatable {
     participants,
     creator,
     lastMessage,
+    lastMessageSender,
     lastMessageTime,
     unreadCount,
     createdAt,

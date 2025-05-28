@@ -40,7 +40,7 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
 
   /// Check if the group can be created
   bool _canCreateGroup() {
-    return _selectedUsers.isNotEmpty &&
+    return _selectedUsers.length >= 2 &&
         _groupNameController.text.trim().isNotEmpty &&
         !_isCreating;
   }
@@ -143,23 +143,41 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
           // Selected users count
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Select Participants', style: theme.textTheme.titleMedium),
-                const SizedBox(width: 8),
-                Chip(
-                  label: Text('${_selectedUsers.length} selected'),
-                  backgroundColor:
-                      _selectedUsers.isNotEmpty
-                          ? theme.colorScheme.primary.withAlpha(26)
-                          : Colors.grey.withAlpha(26),
-                  labelStyle: TextStyle(
-                    color:
-                        _selectedUsers.isNotEmpty
-                            ? theme.colorScheme.primary
-                            : Colors.grey,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Select Participants',
+                      style: theme.textTheme.titleMedium,
+                    ),
+                    const SizedBox(width: 8),
+                    Chip(
+                      label: Text('${_selectedUsers.length} selected'),
+                      backgroundColor:
+                          _selectedUsers.length >= 2
+                              ? theme.colorScheme.primary.withAlpha(26)
+                              : Colors.grey.withAlpha(26),
+                      labelStyle: TextStyle(
+                        color:
+                            _selectedUsers.length >= 2
+                                ? theme.colorScheme.primary
+                                : Colors.grey,
+                      ),
+                    ),
+                  ],
                 ),
+                if (_selectedUsers.length < 2)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4.0),
+                    child: Text(
+                      'Select at least 2 participants to create a group',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.error,
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -226,101 +244,114 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
       }
     }
 
-    if (_formKey.currentState!.validate() && _selectedUsers.isNotEmpty) {
-      setState(() {
-        _isCreating = true;
-      });
+    if (!_formKey.currentState!.validate()) {
+      return;
+    }
 
-      try {
-        // Get provider before async operation
-        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-
-        // Store error message before async operation
-        final errorMessageProvider =
-            chatProvider.error ?? 'Failed to create group';
-
-        // Get user IDs of selected users
-        final userIds =
-            _selectedUsers.map((user) => user.id.toString()).toList();
-
-        // Get form values before async operation
-        final groupName = _groupNameController.text.trim();
-        final groupImageUrl =
-            _groupImageController.text.trim().isNotEmpty
-                ? _groupImageController.text.trim()
-                : null;
-
-        // Create the group
-        final roomId = await chatProvider.createRoom(
-          userIds: userIds,
-          name: groupName,
-          imageUrl: groupImageUrl,
-          isGroup: true,
-        );
-
-        // Use the safe context method
-        if (roomId != null) {
-          // Try to find the newly created room and navigate to it
-          try {
-            // Wait a moment to ensure the room list is updated
-            await Future.delayed(const Duration(milliseconds: 500));
-
-            // Find the room in the updated list
-            final newRoom = chatProvider.rooms.firstWhere(
-              (room) => room.id == roomId,
-              orElse: () => throw Exception('Room not found in list'),
-            );
-
-            // Convert types.Room to ChatRoom using the public method
-            final chatRoom = chatProvider.convertRoomToChatRoom(newRoom);
-
-            // Navigate to the chat screen with the newly created room
-            safelyUseContext((ctx) {
-              Navigator.of(
-                ctx,
-              ).pop(true); // Close create group screen with success indicator
-              Navigator.of(ctx).push(
-                MaterialPageRoute(
-                  builder: (context) => ChatScreen(chatRoom: chatRoom),
-                ),
-              );
-            });
-          } catch (e) {
-            // If navigation fails, just return with success
-            safelyUseContext((ctx) {
-              Navigator.of(ctx).pop(true); // Return success indicator
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                const SnackBar(
-                  content: Text('Group created successfully!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
-            });
-          }
-        } else {
-          safelyUseContext(
-            (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(
-              SnackBar(
-                content: Text(errorMessageProvider),
-                backgroundColor: Colors.red,
-              ),
-            ),
-          );
-        }
-      } catch (e) {
-        // Use the safe context method for error handling
-        final errorMessage = 'Error: $e';
-        safelyUseContext(
-          (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(
-            SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+    if (_selectedUsers.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please select at least 2 participants to create a group',
           ),
-        );
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isCreating = false;
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isCreating = true;
+    });
+
+    try {
+      // Get provider before async operation
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+      // Store error message before async operation
+      final errorMessageProvider =
+          chatProvider.error ?? 'Failed to create group';
+
+      // Get user IDs of selected users
+      final userIds = _selectedUsers.map((user) => user.id.toString()).toList();
+
+      // Get form values before async operation
+      final groupName = _groupNameController.text.trim();
+      final groupImageUrl =
+          _groupImageController.text.trim().isNotEmpty
+              ? _groupImageController.text.trim()
+              : null;
+
+      // Create the group
+      final roomId = await chatProvider.createRoom(
+        userIds: userIds,
+        name: groupName,
+        imageUrl: groupImageUrl,
+        isGroup: true,
+      );
+
+      // Use the safe context method
+      if (roomId != null) {
+        // Try to find the newly created room and navigate to it
+        try {
+          // Wait a moment to ensure the room list is updated
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // Find the room in the updated list
+          final newRoom = chatProvider.rooms.firstWhere(
+            (room) => room.id == roomId,
+            orElse: () => throw Exception('Room not found in list'),
+          );
+
+          // Convert types.Room to ChatRoom using the public method
+          final chatRoom = chatProvider.convertRoomToChatRoom(newRoom);
+
+          // Navigate to the chat screen with the newly created room
+          safelyUseContext((ctx) {
+            Navigator.of(
+              ctx,
+            ).pop(true); // Close create group screen with success indicator
+            Navigator.of(ctx).push(
+              MaterialPageRoute(
+                builder: (context) => ChatScreen(chatRoom: chatRoom),
+              ),
+            );
+          });
+        } catch (e) {
+          // If navigation fails, just return with success
+          safelyUseContext((ctx) {
+            Navigator.of(ctx).pop(true); // Return success indicator
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text('Group created successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
           });
         }
+      } else {
+        safelyUseContext(
+          (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(
+            SnackBar(
+              content: Text(errorMessageProvider),
+              backgroundColor: Colors.red,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      // Use the safe context method for error handling
+      final errorMessage = 'Error: $e';
+      safelyUseContext(
+        (ctx) => ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isCreating = false;
+        });
       }
     }
   }

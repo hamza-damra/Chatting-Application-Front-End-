@@ -1,6 +1,5 @@
 import 'dart:io';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:http_parser/http_parser.dart';
 import 'package:path/path.dart' as path;
 import '../config/api_config.dart';
@@ -9,18 +8,64 @@ import '../utils/logger.dart';
 
 class ApiFileService {
   final TokenService _tokenService;
+  late final Dio _dio;
 
   ApiFileService({required TokenService tokenService})
-    : _tokenService = tokenService;
+    : _tokenService = tokenService {
+    _dio = Dio(
+      BaseOptions(
+        baseUrl: ApiConfig.baseUrl,
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 30),
+        sendTimeout: const Duration(
+          seconds: 60,
+        ), // Longer timeout for file uploads
+      ),
+    );
 
-  /// Upload a file via REST API
+    // Add interceptor for automatic token handling
+    _dio.interceptors.add(
+      InterceptorsWrapper(
+        onRequest: (options, handler) async {
+          if (_tokenService.accessToken != null) {
+            options.headers['Authorization'] =
+                'Bearer ${_tokenService.accessToken}';
+          }
+          return handler.next(options);
+        },
+        onError: (DioException error, handler) async {
+          // Handle token refresh on 401 errors
+          if (error.response?.statusCode == 401) {
+            try {
+              final refreshed = await _tokenService.refreshAccessToken();
+              if (refreshed) {
+                // Retry the request with the new token
+                error.requestOptions.headers['Authorization'] =
+                    'Bearer ${_tokenService.accessToken}';
+                final response = await _dio.fetch(error.requestOptions);
+                return handler.resolve(response);
+              }
+            } catch (e) {
+              AppLogger.e('ApiFileService', 'Error refreshing token: $e');
+            }
+          }
+          return handler.next(error);
+        },
+      ),
+    );
+  }
+
+  /// Upload a file via REST API with real progress tracking using Dio
   Future<FileUploadResponse> uploadFile({
     required File file,
     required int chatRoomId,
     Function(double)? onProgress,
   }) async {
     try {
-      AppLogger.i('ApiFileService', 'Starting file upload via REST API');
+      AppLogger.i(
+        'ApiFileService',
+        'Starting file upload via REST API with Dio',
+      );
 
       // Ensure we have a valid token
       await _ensureValidToken();
@@ -52,84 +97,94 @@ class ApiFileService {
         throw Exception('File size exceeds 1GB limit');
       }
 
-      // Create multipart request to the exact backend endpoint
-      final uploadUrl = '${ApiConfig.baseUrl}${ApiConfig.filesEndpoint}/upload';
-      AppLogger.d('ApiFileService', 'Upload URL: $uploadUrl');
-
-      var request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
-
-      // Add headers
-      request.headers.addAll({
-        'Authorization': 'Bearer ${_tokenService.accessToken}',
-        'Accept': 'application/json',
+      // Create FormData for multipart upload
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          file.path,
+          filename: fileName,
+          contentType: MediaType.parse(contentType),
+        ),
+        'chatRoomId': chatRoomId.toString(),
       });
 
-      // Add file with explicit content type
-      final mediaType = MediaType.parse(contentType);
-      final multipartFile = await http.MultipartFile.fromPath(
-        'file',
-        file.path,
-        filename: fileName,
-        contentType: mediaType,
-      );
-
-      // Log the actual content type being sent
-      AppLogger.d(
-        'ApiFileService',
-        'Multipart file content type: ${multipartFile.contentType}',
-      );
-      AppLogger.d('ApiFileService', 'Expected content type: $contentType');
-      AppLogger.d('ApiFileService', 'MediaType: ${mediaType.toString()}');
-
-      request.files.add(multipartFile);
-
-      // Add chat room ID
-      request.fields['chatRoomId'] = chatRoomId.toString();
-
       AppLogger.i(
         'ApiFileService',
-        'Sending multipart request to: ${request.url}',
+        'Sending Dio multipart request to: ${ApiConfig.filesEndpoint}/upload',
       );
-      AppLogger.d('ApiFileService', 'Request headers: ${request.headers}');
-      AppLogger.d('ApiFileService', 'Request fields: ${request.fields}');
 
       // Send request with progress tracking
-      var streamedResponse = await request.send();
-
-      // Get response body
-      var responseBody = await streamedResponse.stream.bytesToString();
+      final response = await _dio.post(
+        '${ApiConfig.filesEndpoint}/upload',
+        data: formData,
+        onSendProgress: (int sent, int total) {
+          if (onProgress != null && total > 0) {
+            final progress = sent / total;
+            AppLogger.d(
+              'ApiFileService',
+              'Upload progress: ${(progress * 100).toStringAsFixed(1)}% ($sent/$total bytes)',
+            );
+            onProgress(progress);
+          }
+        },
+        options: Options(
+          headers: {'Accept': 'application/json'},
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
 
       AppLogger.i(
         'ApiFileService',
-        'Upload response status: ${streamedResponse.statusCode}',
+        'Upload response status: ${response.statusCode}',
       );
-      AppLogger.d('ApiFileService', 'Upload response body: $responseBody');
+      AppLogger.d('ApiFileService', 'Upload response data: ${response.data}');
 
-      if (streamedResponse.statusCode == 200 ||
-          streamedResponse.statusCode == 201) {
-        var jsonResponse = json.decode(responseBody);
-
-        final response = FileUploadResponse.fromJson(jsonResponse);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final fileUploadResponse = FileUploadResponse.fromJson(response.data);
         AppLogger.i(
           'ApiFileService',
-          'File uploaded successfully: ${response.fileUrl}',
+          'File uploaded successfully: ${fileUploadResponse.fileUrl}',
         );
 
-        return response;
+        return fileUploadResponse;
       } else {
-        String errorMessage =
-            'File upload failed: ${streamedResponse.statusCode}';
-        if (responseBody.isNotEmpty) {
+        String errorMessage = 'File upload failed: ${response.statusCode}';
+        if (response.data != null) {
           try {
-            var errorJson = json.decode(responseBody);
-            errorMessage =
-                errorJson['message'] ?? errorJson['error'] ?? errorMessage;
+            final errorData = response.data;
+            if (errorData is Map<String, dynamic>) {
+              errorMessage =
+                  errorData['message'] ?? errorData['error'] ?? errorMessage;
+            } else {
+              errorMessage = '$errorMessage - ${response.data}';
+            }
           } catch (e) {
-            errorMessage = '$errorMessage - $responseBody';
+            errorMessage = '$errorMessage - ${response.data}';
           }
         }
         throw Exception(errorMessage);
       }
+    } on DioException catch (e) {
+      AppLogger.e('ApiFileService', 'Dio upload error: ${e.message}');
+
+      String errorMessage = 'File upload failed';
+      if (e.response?.data != null) {
+        try {
+          final errorData = e.response!.data;
+          if (errorData is Map<String, dynamic>) {
+            errorMessage =
+                errorData['message'] ??
+                errorData['error'] ??
+                e.message ??
+                errorMessage;
+          }
+        } catch (_) {
+          errorMessage = e.message ?? errorMessage;
+        }
+      } else {
+        errorMessage = e.message ?? errorMessage;
+      }
+
+      throw Exception(errorMessage);
     } catch (e) {
       AppLogger.e('ApiFileService', 'File upload error: $e');
       throw Exception('File upload failed: $e');

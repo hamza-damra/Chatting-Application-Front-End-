@@ -600,7 +600,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              chatRoom.lastMessage ?? 'No messages yet',
+                              _getLastMessageDisplay(chatRoom),
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurface.withValues(
                                   alpha: 0.7,
@@ -655,6 +655,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
         color: theme.colorScheme.primary,
       ),
     );
+  }
+
+  String _getLastMessageDisplay(ChatRoomModel chatRoom) {
+    final lastMessage = chatRoom.lastMessage;
+    final lastMessageSender = chatRoom.lastMessageSender;
+    final isGroup = chatRoom.type == ChatRoomType.group;
+
+    if (lastMessage != null && lastMessage.isNotEmpty) {
+      if (isGroup &&
+          lastMessageSender != null &&
+          lastMessageSender.isNotEmpty) {
+        // For group chats, show "SenderName: message"
+        return '$lastMessageSender: $lastMessage';
+      } else {
+        // For private chats, just show the message content
+        return lastMessage;
+      }
+    }
+
+    return 'No messages yet';
   }
 
   String _formatTime(DateTime dateTime) {

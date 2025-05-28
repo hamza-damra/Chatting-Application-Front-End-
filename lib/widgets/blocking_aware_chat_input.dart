@@ -102,35 +102,29 @@ class _BlockingAwareChatInputState extends State<BlockingAwareChatInput> {
             _onBlockStatusChanged();
           }
         },
-        child: Column(
-          children: [
-            // Show blocking status message if needed
-            if (_chatBlockingService.shouldDisableMessaging(_blockingStatus))
-              _buildBlockingStatusBar(),
-
-            // Chat input (disabled if blocked)
-            ProfessionalChatInput(
-              controller: widget.controller,
-              onSendMessage: widget.onSendMessage,
-              onAttachmentPressed: widget.onAttachmentPressed,
-              onChanged: widget.onChanged,
-              onTypingChanged: widget.onTypingChanged,
-              hintText: _getHintText(),
-              maxLines: widget.maxLines,
-              minLines: widget.minLines,
-              isEnabled:
-                  !_chatBlockingService.shouldDisableMessaging(
-                    _blockingStatus,
-                  ) &&
-                  !_isCheckingStatus,
-            ),
-          ],
-        ),
+        child:
+            _chatBlockingService.shouldDisableMessaging(_blockingStatus)
+                ? _buildProfessionalBlockingInterface()
+                : _buildNormalChatInput(),
       ),
     );
   }
 
-  Widget _buildBlockingStatusBar() {
+  Widget _buildNormalChatInput() {
+    return ProfessionalChatInput(
+      controller: widget.controller,
+      onSendMessage: widget.onSendMessage,
+      onAttachmentPressed: widget.onAttachmentPressed,
+      onChanged: widget.onChanged,
+      onTypingChanged: widget.onTypingChanged,
+      hintText: _getHintText(),
+      maxLines: widget.maxLines,
+      minLines: widget.minLines,
+      isEnabled: !_isCheckingStatus,
+    );
+  }
+
+  Widget _buildProfessionalBlockingInterface() {
     final theme = Theme.of(context);
     final message = _chatBlockingService.getBlockingMessage(
       _blockingStatus,
@@ -142,35 +136,70 @@ class _BlockingAwareChatInputState extends State<BlockingAwareChatInput> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: theme.colorScheme.errorContainer.withValues(alpha: 0.1),
-        border: Border(
-          top: BorderSide(
-            color: theme.colorScheme.error.withValues(alpha: 0.3),
-            width: 1,
-          ),
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: theme.colorScheme.outline.withValues(alpha: 0.2),
+          width: 1,
         ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.block, size: 20, color: theme.colorScheme.error),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.error,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+        boxShadow: [
+          BoxShadow(
+            color: theme.colorScheme.shadow.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Blocking icon
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.errorContainer.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.block, size: 32, color: theme.colorScheme.error),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Blocking message
+          Text(
+            message,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+
+          const SizedBox(height: 8),
+
+          // Additional context message
+          Text(
+            _getContextMessage(),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
+          ),
+
           if (showUnblockOption) ...[
-            const SizedBox(width: 8),
-            BlockUserButton(
-              userId: widget.otherUserId,
-              userName: widget.otherUserName,
-              onBlockStatusChanged: _onBlockStatusChanged,
+            const SizedBox(height: 20),
+            // Unblock button
+            SizedBox(
+              width: double.infinity,
+              child: BlockUserButton(
+                userId: widget.otherUserId,
+                userName: widget.otherUserName,
+                onBlockStatusChanged: _onBlockStatusChanged,
+              ),
             ),
           ],
         ],
@@ -178,11 +207,22 @@ class _BlockingAwareChatInputState extends State<BlockingAwareChatInput> {
     );
   }
 
+  String _getContextMessage() {
+    switch (_blockingStatus) {
+      case BlockingStatus.currentBlocked:
+        return 'You have blocked ${widget.otherUserName}. They cannot send you messages until you unblock them.';
+      case BlockingStatus.blockedBy:
+        return '${widget.otherUserName} has blocked you. You cannot send messages to them.';
+      case BlockingStatus.mutual:
+        return 'You and ${widget.otherUserName} have blocked each other.';
+      default:
+        return 'Messaging is currently disabled.';
+    }
+  }
+
   String _getHintText() {
     if (_isCheckingStatus) {
       return 'Checking status...';
-    } else if (_chatBlockingService.shouldDisableMessaging(_blockingStatus)) {
-      return 'Messaging disabled';
     } else {
       return widget.hintText;
     }

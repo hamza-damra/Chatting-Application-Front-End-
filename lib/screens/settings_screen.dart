@@ -417,7 +417,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: theme.colorScheme.primary,
+            activeTrackColor: theme.colorScheme.primary,
           ),
         ],
       ),
@@ -481,7 +481,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 value ? ThemeMode.dark : ThemeMode.light,
               );
             },
-            activeColor: theme.colorScheme.primary,
+            activeTrackColor: theme.colorScheme.primary,
           ),
         ],
       ),

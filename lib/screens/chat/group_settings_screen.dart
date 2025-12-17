@@ -800,7 +800,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: theme.colorScheme.primary,
+            activeTrackColor: theme.colorScheme.primary,
           ),
         ],
       ),

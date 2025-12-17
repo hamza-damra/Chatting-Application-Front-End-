@@ -4,7 +4,6 @@ import '../models/message.dart';
 import '../widgets/chat_image_thumbnail.dart';
 import '../widgets/video_player_widget.dart';
 import '../utils/url_utils.dart';
-import '../utils/logger.dart';
 
 /// Modern message bubble widget with consistent theming and animations
 class ModernMessageBubble extends StatefulWidget {

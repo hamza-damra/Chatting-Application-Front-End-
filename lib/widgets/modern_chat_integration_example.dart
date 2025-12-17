@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../models/message.dart';
-import '../providers/chat_provider.dart';
 import '../widgets/modern_message_bubble.dart';
 import '../widgets/shimmer_widgets.dart';
 
@@ -251,7 +249,7 @@ class _ModernChatIntegrationExampleState extends State<ModernChatIntegrationExam
 
   void _onMessageTap(Message message) {
     // Handle message tap (e.g., show details, copy text, etc.)
-    print('Message tapped: ${message.id}');
+    debugPrint('Message tapped: ${message.id}');
   }
 
   void _onMessageLongPress(Message message) {
@@ -305,7 +303,7 @@ class _ModernChatIntegrationExampleState extends State<ModernChatIntegrationExam
 
   void _sendMessage() {
     // Handle sending message
-    print('Send message');
+    debugPrint('Send message');
   }
 }
 

@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/api_auth_provider.dart';
 import '../providers/theme_provider.dart';
-import '../widgets/custom_button.dart';
 import '../services/background_notification_manager.dart';
+import '../design_system/components/app_button.dart';
+import '../design_system/components/app_list_tile.dart';
+import '../design_system/components/responsive_container.dart';
+import '../design_system/states/skeleton_tile.dart';
+import '../design_system/tokens/app_colors.dart';
+import '../design_system/tokens/app_spacing.dart';
 import 'media_gallery_screen.dart';
 import 'storage_stats_screen.dart';
 import 'blocked_users_screen.dart';
@@ -15,10 +20,31 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends State<SettingsScreen>
+    with AutomaticKeepAliveClientMixin {
   bool _notifications = true;
   bool _readReceipts = true;
   bool _typingIndicators = true;
+  bool _isLoading = false;
+
+  // State preservation for orientation changes
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() => _isLoading = true);
+    // Simulate loading remote settings
+    await Future.delayed(const Duration(milliseconds: 500));
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
 
   /// Request background notification permissions
   Future<void> _requestBackgroundNotificationPermissions() async {
@@ -52,450 +78,373 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+
+  /// Show logout confirmation dialog
+  /// Returns true if user confirms logout, false otherwise
+  Future<bool> _showLogoutConfirmationDialog() async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark ? const DarkAppColors() : const LightAppColors();
+
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Logout',
+          style: TextStyle(
+            color: colors.textPrimary,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        content: Text(
+          'Are you sure you want to logout? You will need to sign in again to access your messages.',
+          style: TextStyle(color: colors.textSecondary),
+        ),
+        backgroundColor: colors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: colors.textSecondary),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(
+              'Logout',
+              style: TextStyle(
+                color: colors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await _showLogoutConfirmationDialog();
+    if (!confirmed) return;
+
+    final authProvider = Provider.of<ApiAuthProvider>(context, listen: false);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    try {
+      await authProvider.logout();
+      // The AuthWrapper will automatically handle navigation to login
+    } catch (e) {
+      if (mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text('Error logging out: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Required for AutomaticKeepAliveClientMixin to preserve state
+    super.build(context);
+    
     final authProvider = Provider.of<ApiAuthProvider>(context);
     final themeProvider = Provider.of<ThemeProvider>(context);
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark ? const DarkAppColors() : const LightAppColors();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+    if (_isLoading) {
+      return _buildLoadingState();
+    }
+
+    return ResponsiveContainer(
+      maxWidth: ResponsiveMaxWidths.profileSettings,
+      scrollable: true,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Account Section
-          _buildSectionHeader('Account', theme),
-          const SizedBox(height: 16),
-          _buildModernSettingCard(
-            icon: Icons.person,
-            title: 'Account Information',
-            subtitle: 'View and edit your account details',
-            theme: theme,
-            onTap: () {
-              // Navigate to account details screen
-            },
-          ),
-          const SizedBox(height: 12),
-          _buildModernSettingCard(
-            icon: Icons.lock,
-            title: 'Privacy & Security',
-            subtitle: 'Manage your privacy settings',
-            theme: theme,
-            onTap: () {
-              // Navigate to privacy settings screen
-            },
-          ),
-          const SizedBox(height: 12),
-          _buildModernSettingCard(
-            icon: Icons.block,
-            title: 'Blocked Users',
-            subtitle: 'Manage blocked users',
-            theme: theme,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BlockedUsersScreen(),
-                ),
-              );
-            },
+          _buildSectionHeader('Account', colors),
+          const SizedBox(height: AppSpacing.md),
+          _buildSectionCard(
+            colors: colors,
+            children: [
+              AppListTile(
+                leadingIcon: Icons.person,
+                title: 'Account Information',
+                subtitle: 'View and edit your account details',
+                trailing: AppListTileTrailing.chevron,
+                showDivider: true,
+                onTap: () {
+                  // Navigate to account details screen
+                },
+              ),
+              AppListTile(
+                leadingIcon: Icons.lock,
+                title: 'Privacy & Security',
+                subtitle: 'Manage your privacy settings',
+                trailing: AppListTileTrailing.chevron,
+                showDivider: true,
+                onTap: () {
+                  // Navigate to privacy settings screen
+                },
+              ),
+              AppListTile(
+                leadingIcon: Icons.block,
+                title: 'Blocked Users',
+                subtitle: 'Manage blocked users',
+                trailing: AppListTileTrailing.chevron,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const BlockedUsersScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
 
-          // Appearance Section
-          const SizedBox(height: 32),
-          _buildSectionHeader('Appearance', theme),
-          const SizedBox(height: 16),
-          _buildThemeCard(themeProvider, theme),
+          const SizedBox(height: AppSpacing.sectionSpacing),
 
           // Notifications Section
-          const SizedBox(height: 32),
-          _buildSectionHeader('Notifications', theme),
-          const SizedBox(height: 16),
-          _buildModernSwitchCard(
-            icon: Icons.notifications,
-            title: 'Push Notifications',
-            subtitle: 'Receive notifications for new messages',
-            value: _notifications,
-            theme: theme,
-            onChanged: (value) {
-              setState(() {
-                _notifications = value;
-                // Notification settings functionality to be implemented
-              });
-            },
-          ),
-          const SizedBox(height: 12),
-          _buildModernSettingCard(
-            icon: Icons.security,
-            title: 'Background Notification Permissions',
-            subtitle: 'Grant permissions for background notifications',
-            theme: theme,
-            onTap: () => _requestBackgroundNotificationPermissions(),
-          ),
-
-          // Chat Settings Section
-          const SizedBox(height: 32),
-          _buildSectionHeader('Chat Settings', theme),
-          const SizedBox(height: 16),
-          _buildModernSwitchCard(
-            icon: Icons.done_all,
-            title: 'Read Receipts',
-            subtitle: 'Let others know when you\'ve read their messages',
-            value: _readReceipts,
-            theme: theme,
-            onChanged: (value) {
-              setState(() {
-                _readReceipts = value;
-                // Read receipts functionality to be implemented
-              });
-            },
-          ),
-          const SizedBox(height: 12),
-          _buildModernSwitchCard(
-            icon: Icons.keyboard,
-            title: 'Typing Indicators',
-            subtitle: 'Show when you\'re typing a message',
-            value: _typingIndicators,
-            theme: theme,
-            onChanged: (value) {
-              setState(() {
-                _typingIndicators = value;
-                // Typing indicators functionality to be implemented
-              });
-            },
+          _buildSectionHeader('Notifications', colors),
+          const SizedBox(height: AppSpacing.md),
+          _buildSectionCard(
+            colors: colors,
+            children: [
+              AppListTile(
+                leadingIcon: Icons.notifications,
+                title: 'Push Notifications',
+                subtitle: 'Receive notifications for new messages',
+                trailing: AppListTileTrailing.toggle,
+                toggleValue: _notifications,
+                showDivider: true,
+                onToggleChanged: (value) {
+                  setState(() => _notifications = value);
+                },
+              ),
+              AppListTile(
+                leadingIcon: Icons.security,
+                title: 'Background Permissions',
+                subtitle: 'Grant permissions for background notifications',
+                trailing: AppListTileTrailing.chevron,
+                onTap: () => _requestBackgroundNotificationPermissions(),
+              ),
+            ],
           ),
 
-          // Media & Storage Section
-          const SizedBox(height: 32),
-          _buildSectionHeader('Media & Storage', theme),
-          const SizedBox(height: 16),
-          _buildModernSettingCard(
-            icon: Icons.photo_library,
-            title: 'Media Gallery',
-            subtitle: 'View all shared media files',
-            theme: theme,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const MediaGalleryScreen(),
-                ),
-              );
-            },
+          const SizedBox(height: AppSpacing.sectionSpacing),
+
+          // Chat Section
+          _buildSectionHeader('Chat', colors),
+          const SizedBox(height: AppSpacing.md),
+          _buildSectionCard(
+            colors: colors,
+            children: [
+              AppListTile(
+                leadingIcon: Icons.done_all,
+                title: 'Read Receipts',
+                subtitle: 'Let others know when you\'ve read their messages',
+                trailing: AppListTileTrailing.toggle,
+                toggleValue: _readReceipts,
+                showDivider: true,
+                onToggleChanged: (value) {
+                  setState(() => _readReceipts = value);
+                },
+              ),
+              AppListTile(
+                leadingIcon: Icons.keyboard,
+                title: 'Typing Indicators',
+                subtitle: 'Show when you\'re typing a message',
+                trailing: AppListTileTrailing.toggle,
+                toggleValue: _typingIndicators,
+                showDivider: true,
+                onToggleChanged: (value) {
+                  setState(() => _typingIndicators = value);
+                },
+              ),
+              _buildThemeTile(themeProvider, colors),
+            ],
           ),
-          const SizedBox(height: 12),
-          _buildModernSettingCard(
-            icon: Icons.storage,
-            title: 'Storage Statistics',
-            subtitle: 'View storage usage and statistics',
-            theme: theme,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const StorageStatsScreen(),
-                ),
-              );
-            },
+
+          const SizedBox(height: AppSpacing.sectionSpacing),
+
+          // Media Section
+          _buildSectionHeader('Media', colors),
+          const SizedBox(height: AppSpacing.md),
+          _buildSectionCard(
+            colors: colors,
+            children: [
+              AppListTile(
+                leadingIcon: Icons.photo_library,
+                title: 'Media Gallery',
+                subtitle: 'View all shared media files',
+                trailing: AppListTileTrailing.chevron,
+                showDivider: true,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const MediaGalleryScreen(),
+                    ),
+                  );
+                },
+              ),
+              AppListTile(
+                leadingIcon: Icons.storage,
+                title: 'Storage Statistics',
+                subtitle: 'View storage usage and statistics',
+                trailing: AppListTileTrailing.chevron,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const StorageStatsScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
+
+          const SizedBox(height: AppSpacing.sectionSpacing),
 
           // About Section
-          const SizedBox(height: 32),
-          _buildSectionHeader('About', theme),
-          const SizedBox(height: 16),
-          _buildModernSettingCard(
-            icon: Icons.info_outline,
-            title: 'About Vector',
-            subtitle: 'Version 1.0.0',
-            theme: theme,
-            onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: 'Vector',
-                applicationVersion: '1.0.0',
-                applicationIcon: Icon(
-                  Icons.chat_rounded,
-                  color: theme.colorScheme.primary,
-                  size: 40,
-                ),
-                applicationLegalese: '© 2023 Vector Chat App',
-              );
-            },
-          ),
-          const SizedBox(height: 12),
-          _buildModernSettingCard(
-            icon: Icons.help_outline,
-            title: 'Help & Support',
-            subtitle: 'Get help with using the app',
-            theme: theme,
-            onTap: () {
-              // Navigate to help screen
-            },
-          ),
-
-          const SizedBox(height: 32),
-
-          // Logout Button
-          SizedBox(
-            width: double.infinity,
-            child: CustomButton(
-              text: 'Logout',
-              onPressed: () async {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder:
-                      (context) => AlertDialog(
-                        title: const Text('Logout'),
-                        content: const Text('Are you sure you want to logout?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(context, true),
-                            child: const Text('Logout'),
-                          ),
-                        ],
-                      ),
-                );
-                if (confirm == true) {
-                  try {
-                    await authProvider.logout();
-                    // The AuthWrapper will automatically handle navigation to login
-                    // when the authentication state changes, so no manual navigation needed
-                  } catch (e) {
-                    if (mounted) {
-                      scaffoldMessenger.showSnackBar(
-                        SnackBar(
-                          content: Text('Error logging out: ${e.toString()}'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                }
-              },
-              isLoading: authProvider.isLoading,
-              color: Colors.red,
-              height: 50,
-              borderRadius: 12,
-            ),
+          _buildSectionHeader('About', colors),
+          const SizedBox(height: AppSpacing.md),
+          _buildSectionCard(
+            colors: colors,
+            children: [
+              AppListTile(
+                leadingIcon: Icons.info_outline,
+                title: 'About Vector',
+                subtitle: 'Version 1.0.0',
+                trailing: AppListTileTrailing.chevron,
+                showDivider: true,
+                onTap: () {
+                  showAboutDialog(
+                    context: context,
+                    applicationName: 'Vector',
+                    applicationVersion: '1.0.0',
+                    applicationIcon: Icon(
+                      Icons.chat_rounded,
+                      color: colors.primary,
+                      size: 40,
+                    ),
+                    applicationLegalese: '© 2023 Vector Chat App',
+                  );
+                },
+              ),
+              AppListTile(
+                leadingIcon: Icons.help_outline,
+                title: 'Help & Support',
+                subtitle: 'Get help with using the app',
+                trailing: AppListTileTrailing.chevron,
+                onTap: () {
+                  // Navigate to help screen
+                },
+              ),
+            ],
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: AppSpacing.xxxl),
+
+          // Logout Button - Destructive styling
+          AppButton(
+            label: 'Logout',
+            onPressed: _handleLogout,
+            isLoading: authProvider.isLoading,
+            isDestructive: true,
+            expanded: true,
+            size: AppButtonSize.large,
+            icon: Icons.logout,
+            semanticLabel: 'Logout from your account',
+          ),
+
+          const SizedBox(height: AppSpacing.xxl),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title, ThemeData theme) {
+
+  Widget _buildLoadingState() {
+    return ResponsiveContainer(
+      maxWidth: ResponsiveMaxWidths.profileSettings,
+      scrollable: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Generate skeleton tiles for loading state
+          ...List.generate(
+            8,
+            (index) => const Padding(
+              padding: EdgeInsets.only(bottom: AppSpacing.sm),
+              child: SkeletonTile(type: SkeletonTileType.settingsItem),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title, AppColors colors) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
       child: Text(
         title,
-        style: theme.textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.bold,
-          color: theme.colorScheme.onSurface,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: colors.textSecondary,
+          letterSpacing: 0.5,
         ),
       ),
     );
   }
 
-  Widget _buildModernSettingCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required ThemeData theme,
-    required VoidCallback onTap,
+  Widget _buildSectionCard({
+    required AppColors colors,
+    required List<Widget> children,
   }) {
     return Container(
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
+        color: colors.surface,
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
         border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
+          color: colors.outline.withValues(alpha: 0.5),
         ),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      color: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.chevron_right,
-              color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
-            ),
-          ],
-        ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: children,
       ),
     );
   }
 
-  Widget _buildModernSwitchCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required ThemeData theme,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeTrackColor: theme.colorScheme.primary,
-          ),
-        ],
-      ),
+  Widget _buildThemeTile(ThemeProvider themeProvider, AppColors colors) {
+    final isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+    
+    return AppListTile(
+      leadingIcon: isDarkMode ? Icons.dark_mode : Icons.light_mode,
+      title: 'Dark Mode',
+      subtitle: isDarkMode ? 'Dark theme enabled' : 'Light theme enabled',
+      trailing: AppListTileTrailing.toggle,
+      toggleValue: isDarkMode,
+      onToggleChanged: (value) {
+        themeProvider.setThemeMode(
+          value ? ThemeMode.dark : ThemeMode.light,
+        );
+      },
     );
-  }
-
-  Widget _buildThemeCard(ThemeProvider themeProvider, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              themeProvider.themeMode == ThemeMode.dark
-                  ? Icons.dark_mode
-                  : themeProvider.themeMode == ThemeMode.light
-                  ? Icons.light_mode
-                  : Icons.brightness_auto,
-              color: theme.colorScheme.primary,
-              size: 20,
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Theme',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  _getThemeModeText(themeProvider.themeMode),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Switch(
-            value: themeProvider.themeMode == ThemeMode.dark,
-            onChanged: (value) {
-              themeProvider.setThemeMode(
-                value ? ThemeMode.dark : ThemeMode.light,
-              );
-            },
-            activeTrackColor: theme.colorScheme.primary,
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _getThemeModeText(ThemeMode themeMode) {
-    switch (themeMode) {
-      case ThemeMode.light:
-        return 'Light Mode';
-      case ThemeMode.dark:
-        return 'Dark Mode';
-      case ThemeMode.system:
-        return 'System Default';
-    }
   }
 }

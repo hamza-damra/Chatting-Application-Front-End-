@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../design_system/tokens/app_spacing.dart';
+import '../design_system/components/responsive_container.dart';
 import '../services/file_access_service.dart';
 import '../core/services/token_service.dart';
 import '../utils/file_type_helper.dart';
@@ -667,6 +669,68 @@ class _StorageStatsScreenState extends State<StorageStatsScreen>
     );
   }
 
+  /// Builds a responsive grid layout for charts on tablet/desktop
+  Widget _buildResponsiveChartsGrid() {
+    final isDesktop = ResponsiveLayout.isDesktop(context);
+    final isTablet = ResponsiveLayout.isTablet(context);
+
+    final sizeChart = _buildChartCard(
+      title: 'Storage Size Distribution',
+      icon: Icons.pie_chart_outline,
+      chart: PieChart(
+        PieChartData(
+          sections: _getSizeChartSections(),
+          centerSpaceRadius: 30,
+          sectionsSpace: 2,
+          pieTouchData: PieTouchData(
+            touchCallback: (FlTouchEvent event, pieTouchResponse) {
+              // Add touch interaction if needed
+            },
+          ),
+        ),
+      ),
+    );
+
+    final countChart = _buildChartCard(
+      title: 'File Count Distribution',
+      icon: Icons.donut_small_outlined,
+      chart: PieChart(
+        PieChartData(
+          sections: _getCountChartSections(),
+          centerSpaceRadius: 30,
+          sectionsSpace: 2,
+          pieTouchData: PieTouchData(
+            touchCallback: (FlTouchEvent event, pieTouchResponse) {
+              // Add touch interaction if needed
+            },
+          ),
+        ),
+      ),
+    );
+
+    // On desktop/tablet, show charts side by side
+    if (isDesktop || isTablet) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: sizeChart),
+            Expanded(child: countChart),
+          ],
+        ),
+      );
+    }
+
+    // On mobile, stack charts vertically
+    return Column(
+      children: [
+        sizeChart,
+        countChart,
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -686,49 +750,15 @@ class _StorageStatsScreenState extends State<StorageStatsScreen>
                 onRefresh: _loadStorageStats,
                 child: FadeTransition(
                   opacity: _fadeAnimation,
-                  child: SingleChildScrollView(
+                  child: ResponsiveContainer(
+                    maxWidth: ResponsiveMaxWidths.mediaGallery,
+                    scrollable: true,
                     physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.zero,
                     child: Column(
                       children: [
                         _buildStorageStatsCard(),
-                        _buildChartCard(
-                          title: 'Storage Size Distribution',
-                          icon: Icons.pie_chart_outline,
-                          chart: PieChart(
-                            PieChartData(
-                              sections: _getSizeChartSections(),
-                              centerSpaceRadius: 30,
-                              sectionsSpace: 2,
-                              pieTouchData: PieTouchData(
-                                touchCallback: (
-                                  FlTouchEvent event,
-                                  pieTouchResponse,
-                                ) {
-                                  // Add touch interaction if needed
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
-                        _buildChartCard(
-                          title: 'File Count Distribution',
-                          icon: Icons.donut_small_outlined,
-                          chart: PieChart(
-                            PieChartData(
-                              sections: _getCountChartSections(),
-                              centerSpaceRadius: 30,
-                              sectionsSpace: 2,
-                              pieTouchData: PieTouchData(
-                                touchCallback: (
-                                  FlTouchEvent event,
-                                  pieTouchResponse,
-                                ) {
-                                  // Add touch interaction if needed
-                                },
-                              ),
-                            ),
-                          ),
-                        ),
+                        _buildResponsiveChartsGrid(),
                         _buildCategoryTable(),
                         const SizedBox(height: 100), // Space for FAB
                       ],

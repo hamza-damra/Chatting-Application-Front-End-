@@ -90,6 +90,8 @@ dev_dependencies:
   # Added for testing
   mockito: ^5.4.4
   build_runner: ^2.4.8
+  # Property-based testing
+  glados: ^1.1.1
   # App icon generator
   flutter_launcher_icons: ^0.13.1
   # MSI installer generator

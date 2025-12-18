@@ -4,6 +4,7 @@ import '../models/message.dart';
 import '../widgets/chat_image_thumbnail.dart';
 import '../widgets/video_player_widget.dart';
 import '../utils/url_utils.dart';
+import '../design_system/tokens/app_spacing.dart';
 
 /// Modern message bubble widget with consistent theming and animations
 class ModernMessageBubble extends StatefulWidget {
@@ -104,6 +105,29 @@ class _ModernMessageBubbleState extends State<ModernMessageBubble>
   }
 
   Widget _buildMessageContainer(ThemeData theme, bool isDark) {
+    // Use responsive max-width percentage: 75% on mobile, 60% on tablet/desktop
+    final maxWidthPercentage = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 0.75,
+      tablet: 0.65,
+      desktop: 0.60,
+    );
+
+    // Use responsive margins: larger on tablet/desktop
+    final horizontalMargin = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 16.0,
+      tablet: 24.0,
+      desktop: 32.0,
+    );
+
+    final oppositeMargin = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 80.0,
+      tablet: 100.0,
+      desktop: 120.0,
+    );
+
     return Align(
       alignment:
           widget.isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -111,11 +135,11 @@ class _ModernMessageBubbleState extends State<ModernMessageBubble>
         margin: EdgeInsets.only(
           top: 4,
           bottom: 4,
-          left: widget.isCurrentUser ? 80 : 16,
-          right: widget.isCurrentUser ? 16 : 80,
+          left: widget.isCurrentUser ? oppositeMargin : horizontalMargin,
+          right: widget.isCurrentUser ? horizontalMargin : oppositeMargin,
         ),
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.75,
+          maxWidth: MediaQuery.of(context).size.width * maxWidthPercentage,
           minWidth: 60,
         ),
         child: Material(
@@ -207,8 +231,26 @@ class _ModernMessageBubbleState extends State<ModernMessageBubble>
             ? theme.colorScheme.onPrimary.withValues(alpha: 0.7)
             : theme.colorScheme.onSurfaceVariant;
 
+    // Use responsive padding - larger on tablet/desktop for better readability
+    final horizontalPadding = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+
+    final verticalPadding = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 12.0,
+      tablet: 14.0,
+      desktop: 16.0,
+    );
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding,
+        vertical: verticalPadding,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,

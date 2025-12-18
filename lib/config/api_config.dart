@@ -1,6 +1,6 @@
 class ApiConfig {
   // Base URL for API requests
-  static const String baseUrl = 'http://abusaker.zapto.org:8080';
+  static const String baseUrl = 'http://archivingalquds.ddns.net:8080';
 
   // Authentication endpoints
   static const String registerEndpoint = '/api/auth/register';
@@ -36,7 +36,7 @@ class ApiConfig {
   static const String filesEndpoint = '/api/files';
 
   // WebSocket endpoints
-  static const String webSocketEndpoint = 'ws://abusaker.zapto.org:8080/ws';
+  static const String webSocketEndpoint = 'ws://archivingalquds.ddns.net:8080/ws';
 
   // STOMP destinations - Updated to match backend documentation
   static const String stompChatTopic = '/topic/chatrooms/';

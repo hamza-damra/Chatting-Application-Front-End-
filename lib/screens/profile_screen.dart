@@ -2,12 +2,17 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shimmer/shimmer.dart';
 import '../providers/api_auth_provider.dart';
 
-import '../widgets/custom_button.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/shimmer_widgets.dart';
-import '../widgets/profile_image_widget.dart';
+import '../design_system/components/app_avatar.dart';
+import '../design_system/components/app_button.dart';
+import '../design_system/components/app_card.dart';
+import '../design_system/components/app_text_field.dart';
+import '../design_system/components/responsive_container.dart';
+import '../design_system/tokens/app_colors.dart';
+import '../design_system/tokens/app_spacing.dart';
+import '../design_system/states/skeleton_tile.dart';
 import '../models/user_model.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -17,7 +22,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with AutomaticKeepAliveClientMixin {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
@@ -27,6 +33,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   File? _imageFile;
   bool _isEditing = false;
+
+  // State preservation for orientation changes
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -45,7 +55,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _loadUserData() {
     final user = Provider.of<ApiAuthProvider>(context, listen: false).user;
     if (user != null) {
-      // Extract first and last name from fullName
       final nameParts = user.fullName.split(' ');
       _firstNameController.text = nameParts.isNotEmpty ? nameParts[0] : '';
       _lastNameController.text =
@@ -55,7 +64,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickImage() async {
-    // Show bottom sheet to choose between camera and gallery
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -101,14 +109,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to pick image: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        _showErrorSnackbar('Failed to pick image: $e');
       }
     }
+  }
+
+  void _showSuccessSnackbar(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark ? const DarkAppColors() : const LightAppColors();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.check_circle, color: colors.textOnPrimary, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: colors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+        margin: const EdgeInsets.all(AppSpacing.lg),
+      ),
+    );
+  }
+
+  void _showErrorSnackbar(String message, {VoidCallback? onRetry}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark ? const DarkAppColors() : const LightAppColors();
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.error_outline, color: colors.textOnPrimary, size: 20),
+            const SizedBox(width: AppSpacing.sm),
+            Expanded(child: Text(message)),
+          ],
+        ),
+        backgroundColor: colors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+        margin: const EdgeInsets.all(AppSpacing.lg),
+        action: onRetry != null
+            ? SnackBarAction(
+                label: 'Retry',
+                textColor: colors.textOnPrimary,
+                onPressed: onRetry,
+              )
+            : null,
+        duration: const Duration(seconds: 4),
+      ),
+    );
   }
 
   Future<void> _saveProfile() async {
@@ -116,55 +173,39 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final authProvider = Provider.of<ApiAuthProvider>(context, listen: false);
 
       try {
-        // Combine first and last name into fullName
         final fullName =
             "${_firstNameController.text.trim()} ${_lastNameController.text.trim()}";
 
         bool success = true;
 
-        // Upload profile image if a new image was selected
         if (_imageFile != null) {
           success = await authProvider.setProfileImage(imageFile: _imageFile!);
 
           if (!success) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                    authProvider.error ?? 'Failed to upload profile image',
-                  ),
-                  backgroundColor: Colors.red,
-                ),
+              _showErrorSnackbar(
+                authProvider.error ?? 'Failed to upload profile image',
+                onRetry: _saveProfile,
               );
             }
             return;
           }
         }
 
-        // Update profile information (name)
         if (success) {
           success = await authProvider.updateProfile(
             fullName: fullName,
-            profilePicture:
-                null, // Don't update profile picture URL here since it's handled above
+            profilePicture: null,
           );
         }
 
         if (!success && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(authProvider.error ?? 'Failed to update profile'),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 4),
-            ),
+          _showErrorSnackbar(
+            authProvider.error ?? 'Failed to update profile',
+            onRetry: _saveProfile,
           );
         } else if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Profile updated successfully'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          _showSuccessSnackbar('Profile updated successfully');
 
           setState(() {
             _isEditing = false;
@@ -173,11 +214,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error updating profile: $e'),
-              backgroundColor: Colors.red,
-            ),
+          _showErrorSnackbar(
+            'Error updating profile: $e',
+            onRetry: _saveProfile,
           );
         }
       }
@@ -186,25 +225,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Required for AutomaticKeepAliveClientMixin to preserve state
+    super.build(context);
+    
     final authProvider = Provider.of<ApiAuthProvider>(context);
     final user = authProvider.user;
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark ? const DarkAppColors() : const LightAppColors();
 
     if (user == null) {
-      return ShimmerWidgets.profileShimmer(context: context);
+      return _buildLoadingSkeleton(colors);
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20.0),
+    return ResponsiveContainer(
+      maxWidth: ResponsiveMaxWidths.profileSettings,
+      scrollable: true,
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             if (_isEditing) ...[
-              _buildEditingView(user, authProvider, theme),
+              _buildEditingView(user, authProvider, colors),
             ] else ...[
-              _buildProfileView(user, theme),
+              _buildProfileView(user, colors),
             ],
           ],
         ),
@@ -212,23 +256,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildProfileView(UserModel user, ThemeData theme) {
+  Widget _buildLoadingSkeleton(AppColors colors) {
+    return ResponsiveContainer(
+      maxWidth: ResponsiveMaxWidths.profileSettings,
+      scrollable: true,
+      child: Shimmer.fromColors(
+        baseColor: colors.shimmerBase,
+        highlightColor: colors.shimmerHighlight,
+        child: Column(
+          children: [
+            // Profile header skeleton
+            const SkeletonTile(type: SkeletonTileType.profileHeader, animate: false),
+            const SizedBox(height: AppSpacing.sectionSpacing),
+            
+            // Section header skeleton
+            _buildSectionHeaderSkeleton(colors),
+            const SizedBox(height: AppSpacing.lg),
+            
+            // Info cards skeleton
+            ...List.generate(5, (index) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              child: Container(
+                width: double.infinity,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: colors.shimmerBase,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+              ),
+            )),
+            
+            const SizedBox(height: AppSpacing.sectionSpacing),
+            
+            // Statistics section skeleton
+            _buildSectionHeaderSkeleton(colors),
+            const SizedBox(height: AppSpacing.lg),
+            Container(
+              width: double.infinity,
+              height: 100,
+              decoration: BoxDecoration(
+                color: colors.shimmerBase,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSectionHeaderSkeleton(AppColors colors) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        width: 150,
+        height: 20,
+        decoration: BoxDecoration(
+          color: colors.shimmerBase,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProfileView(UserModel user, AppColors colors) {
     return Column(
       children: [
         // Profile Header Section
-        _buildProfileHeader(user, theme),
-        const SizedBox(height: 32),
+        _buildProfileHeader(user, colors),
+        const SizedBox(height: AppSpacing.sectionSpacing),
 
         // Account Information Section
-        _buildAccountInfoSection(user, theme),
-        const SizedBox(height: 24),
+        _buildAccountInfoSection(user, colors),
+        const SizedBox(height: AppSpacing.sectionSpacing),
 
         // Statistics Section
-        _buildStatisticsSection(user, theme),
-        const SizedBox(height: 24),
+        _buildStatisticsSection(user, colors),
+        const SizedBox(height: AppSpacing.sectionSpacing),
 
         // Action Buttons
-        _buildActionButtons(theme),
+        _buildActionButtons(colors),
       ],
     );
   }
@@ -236,85 +343,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildEditingView(
     UserModel user,
     ApiAuthProvider authProvider,
-    ThemeData theme,
+    AppColors colors,
   ) {
     return Column(
       children: [
         // Profile Image with Edit
-        _buildEditableProfileImage(user, theme),
-        const SizedBox(height: 32),
+        _buildEditableProfileImage(user, colors),
+        const SizedBox(height: AppSpacing.sectionSpacing),
 
         // Edit Form
-        _buildEditForm(),
-        const SizedBox(height: 32),
+        _buildEditForm(colors),
+        const SizedBox(height: AppSpacing.sectionSpacing),
 
         // Save/Cancel Buttons
-        _buildEditButtons(authProvider),
+        _buildEditButtons(authProvider, colors),
       ],
     );
   }
 
-  Widget _buildProfileHeader(UserModel user, ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.1),
-            theme.colorScheme.secondary.withValues(alpha: 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
-      ),
+  Widget _buildProfileHeader(UserModel user, AppColors colors) {
+    return AppCard(
+      padding: const EdgeInsets.all(AppSpacing.xxl),
+      backgroundColor: colors.surfaceElevated,
       child: Stack(
         children: [
           // Edit Profile Button - Top Right
-          Positioned(top: 0, right: 0, child: _buildModernEditButton(theme)),
+          Positioned(
+            top: 0,
+            right: 0,
+            child: _buildEditButton(colors),
+          ),
 
           // Main Profile Content
           Column(
             children: [
-              // Profile Image with Status
-              Stack(
-                children: [
-                  EditableProfileImageWidget(
-                    userId: user.id,
-                    userName: user.fullName,
-                    size: 120,
-                    onTap: null,
-                    showEditIcon: false,
-                  ),
-                  // Online Status Indicator
-                  if (user.isOnline)
-                    Positioned(
-                      bottom: 8,
-                      right: 8,
-                      child: Container(
-                        width: 24,
-                        height: 24,
-                        decoration: BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: theme.colorScheme.surface,
-                            width: 3,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.circle,
-                          color: Colors.green,
-                          size: 12,
-                        ),
-                      ),
-                    ),
-                ],
+              // Profile Avatar with Online Status
+              AppAvatar(
+                name: user.fullName,
+                size: AppAvatarSize.extraLarge,
+                showOnlineIndicator: true,
+                isOnline: user.isOnline,
+                semanticLabel: 'Profile picture of ${user.fullName}',
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.lg),
 
               // User Name with Role Badge
               Row(
@@ -323,48 +394,49 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Flexible(
                     child: Text(
                       user.fullName,
-                      style: theme.textTheme.headlineSmall?.copyWith(
+                      style: TextStyle(
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
+                        color: colors.textPrimary,
                       ),
                       textAlign: TextAlign.center,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildRoleBadge(user.role, theme),
+                  const SizedBox(width: AppSpacing.sm),
+                  _buildRoleBadge(user.role, colors),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
 
               // Username
               Text(
                 '@${user.username}',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.primary,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colors.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xs),
 
               // Email
               Text(
                 user.email,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: colors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.sm),
 
               // Status Text
               Text(
                 user.isOnline
                     ? 'Online'
                     : 'Last seen ${_formatLastSeen(user.lastSeen)}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color:
-                      user.isOnline
-                          ? Colors.green
-                          : theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: user.isOnline ? colors.online : colors.textTertiary,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -375,20 +447,52 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildRoleBadge(UserRole role, ThemeData theme) {
-    final isAdmin = role == UserRole.admin;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color:
-            isAdmin
-                ? Colors.orange.withValues(alpha: 0.1)
-                : theme.colorScheme.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isAdmin ? Colors.orange : theme.colorScheme.primary,
-          width: 1,
+  Widget _buildEditButton(AppColors colors) {
+    return Semantics(
+      button: true,
+      label: 'Edit profile',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            setState(() {
+              _isEditing = true;
+            });
+          },
+          borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          child: Container(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(
+                color: colors.primary.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Icon(
+              Icons.edit,
+              color: colors.primary,
+              size: AppSpacing.iconMd,
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildRoleBadge(UserRole role, AppColors colors) {
+    final isAdmin = role == UserRole.admin;
+    final badgeColor = isAdmin ? colors.warning : colors.primary;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: AppSpacing.xs,
+      ),
+      decoration: BoxDecoration(
+        color: badgeColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+        border: Border.all(color: badgeColor, width: 1),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -396,13 +500,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Icon(
             isAdmin ? Icons.admin_panel_settings : Icons.person,
             size: 12,
-            color: isAdmin ? Colors.orange : theme.colorScheme.primary,
+            color: badgeColor,
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Text(
             isAdmin ? 'Admin' : 'User',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: isAdmin ? Colors.orange : theme.colorScheme.primary,
+            style: TextStyle(
+              color: badgeColor,
               fontWeight: FontWeight.bold,
               fontSize: 10,
             ),
@@ -431,79 +535,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Widget _buildAccountInfoSection(UserModel user, ThemeData theme) {
+  Widget _buildAccountInfoSection(UserModel user, AppColors colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            'Account Information',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
+        _buildSectionHeader('Account Information', colors),
+        const SizedBox(height: AppSpacing.lg),
         _buildInfoCard(
           icon: Icons.badge,
           title: 'User ID',
           value: '#${user.id}',
-          theme: theme,
+          colors: colors,
         ),
         _buildInfoCard(
           icon: Icons.alternate_email,
           title: 'Username',
           value: user.username,
-          theme: theme,
+          colors: colors,
         ),
         _buildInfoCard(
           icon: Icons.email_outlined,
           title: 'Email Address',
           value: user.email,
-          theme: theme,
+          colors: colors,
         ),
         _buildInfoCard(
           icon: Icons.calendar_today,
           title: 'Member Since',
           value: _formatDate(user.createdAt),
-          theme: theme,
+          colors: colors,
         ),
         _buildInfoCard(
           icon: Icons.update,
           title: 'Last Updated',
           value: _formatDate(user.updatedAt),
-          theme: theme,
+          colors: colors,
         ),
       ],
     );
   }
 
-  Widget _buildStatisticsSection(UserModel user, ThemeData theme) {
+  Widget _buildSectionHeader(String title, AppColors colors) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+          color: colors.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatisticsSection(UserModel user, AppColors colors) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Text(
-            'Account Statistics',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onSurface,
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.1),
-            ),
-          ),
+        _buildSectionHeader('Account Statistics', colors),
+        const SizedBox(height: AppSpacing.lg),
+        AppCard(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          backgroundColor: colors.surface,
           child: Row(
             children: [
               Expanded(
@@ -511,33 +605,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   icon: Icons.access_time,
                   label: 'Days Active',
                   value: _calculateDaysActive(user.createdAt).toString(),
-                  theme: theme,
+                  colors: colors,
                 ),
               ),
               Container(
                 width: 1,
                 height: 40,
-                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                color: colors.divider,
               ),
               Expanded(
                 child: _buildStatItem(
                   icon: Icons.security,
                   label: 'Account Type',
                   value: user.role == UserRole.admin ? 'Admin' : 'Standard',
-                  theme: theme,
+                  colors: colors,
                 ),
               ),
               Container(
                 width: 1,
                 height: 40,
-                color: theme.colorScheme.outline.withValues(alpha: 0.2),
+                color: colors.divider,
               ),
               Expanded(
                 child: _buildStatItem(
                   icon: Icons.verified_user,
                   label: 'Status',
                   value: 'Verified',
-                  theme: theme,
+                  colors: colors,
                 ),
               ),
             ],
@@ -551,24 +645,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required String label,
     required String value,
-    required ThemeData theme,
+    required AppColors colors,
   }) {
     return Column(
       children: [
-        Icon(icon, color: theme.colorScheme.primary, size: 24),
-        const SizedBox(height: 8),
+        Icon(icon, color: colors.primary, size: AppSpacing.iconLg),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           value,
-          style: theme.textTheme.titleMedium?.copyWith(
+          style: TextStyle(
+            fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: theme.colorScheme.onSurface,
+            color: colors.textPrimary,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xs),
         Text(
           label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+          style: TextStyle(
+            fontSize: 12,
+            color: colors.textSecondary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -585,236 +681,225 @@ class _ProfileScreenState extends State<ProfileScreen> {
     required IconData icon,
     required String title,
     required String value,
-    required ThemeData theme,
+    required AppColors colors,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.1),
-        ),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: AppCard(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        backgroundColor: colors.surface,
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: colors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+              ),
+              child: Icon(icon, color: colors.primary, size: AppSpacing.iconMd),
             ),
-            child: Icon(icon, color: theme.colorScheme.primary, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                    fontWeight: FontWeight.w500,
+            const SizedBox(width: AppSpacing.lg),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: colors.textSecondary,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: theme.colorScheme.onSurface,
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: colors.textPrimary,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModernEditButton(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.primary.withValues(alpha: 0.1),
-            theme.colorScheme.secondary.withValues(alpha: 0.05),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: theme.colorScheme.outline.withValues(alpha: 0.2),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: theme.colorScheme.shadow.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              _isEditing = true;
-            });
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Icon(Icons.edit, color: theme.colorScheme.primary, size: 20),
-          ),
-        ),
       ),
     );
   }
 
-  Widget _buildActionButtons(ThemeData theme) {
-    return Column(
-      children: [
-        // Logout Button
-        SizedBox(
-          width: double.infinity,
-          child: CustomButton(
-            text: 'Logout',
-            onPressed: () async {
-              final authProvider = Provider.of<ApiAuthProvider>(
-                context,
-                listen: false,
-              );
-              // Show confirmation dialog
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder:
-                    (context) => AlertDialog(
-                      title: const Text('Logout'),
-                      content: const Text('Are you sure you want to logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, false),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () => Navigator.pop(context, true),
-                          child: const Text('Logout'),
-                        ),
-                      ],
-                    ),
-              );
-
-              if (confirm == true) {
-                try {
-                  await authProvider.logout();
-                  // The AuthWrapper will automatically handle navigation to login
-                  // when the authentication state changes
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error logging out: ${e.toString()}'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              }
-            },
-            isOutlined: true,
-            height: 50,
-            borderRadius: 12,
-            color: Colors.red,
-          ),
-        ),
-      ],
+  Widget _buildActionButtons(AppColors colors) {
+    return AppButton(
+      label: 'Logout',
+      onPressed: _handleLogout,
+      variant: AppButtonVariant.outlined,
+      isDestructive: true,
+      expanded: true,
+      size: AppButtonSize.large,
+      icon: Icons.logout,
+      semanticLabel: 'Logout from account',
     );
   }
 
-  Widget _buildEditableProfileImage(UserModel user, ThemeData theme) {
-    return Stack(
-      children: [
-        _imageFile != null
-            ? Container(
-              width: 120,
-              height: 120,
+  Future<void> _handleLogout() async {
+    final authProvider = Provider.of<ApiAuthProvider>(context, listen: false);
+    
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final colors = isDark ? const DarkAppColors() : const LightAppColors();
+        
+        return AlertDialog(
+          backgroundColor: colors.surface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+          ),
+          title: Text(
+            'Logout',
+            style: TextStyle(color: colors.textPrimary),
+          ),
+          content: Text(
+            'Are you sure you want to logout?',
+            style: TextStyle(color: colors.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: colors.textSecondary),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(
+                'Logout',
+                style: TextStyle(color: colors.error),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      try {
+        await authProvider.logout();
+      } catch (e) {
+        if (mounted) {
+          _showErrorSnackbar('Error logging out: ${e.toString()}');
+        }
+      }
+    }
+  }
+
+  Widget _buildEditableProfileImage(UserModel user, AppColors colors) {
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Stack(
+        children: [
+          if (_imageFile != null)
+            Container(
+              width: AppSpacing.avatarXl,
+              height: AppSpacing.avatarXl,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: theme.colorScheme.outline.withValues(alpha: 0.3),
+                  color: colors.outline,
                   width: 2,
                 ),
               ),
               child: ClipOval(
                 child: Image.file(
                   _imageFile!,
-                  width: 120,
-                  height: 120,
+                  width: AppSpacing.avatarXl,
+                  height: AppSpacing.avatarXl,
                   fit: BoxFit.cover,
                 ),
               ),
             )
-            : EditableProfileImageWidget(
-              userId: user.id,
-              userName: user.fullName,
-              size: 120,
-              onTap: _pickImage,
-              showEditIcon: true,
+          else
+            AppAvatar(
+              name: user.fullName,
+              size: AppAvatarSize.extraLarge,
+              semanticLabel: 'Profile picture of ${user.fullName}',
             ),
-      ],
+          Positioned(
+            bottom: 0,
+            right: 0,
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.sm),
+              decoration: BoxDecoration(
+                color: colors.primary,
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: colors.surface,
+                  width: 2,
+                ),
+              ),
+              child: Icon(
+                Icons.camera_alt,
+                color: colors.textOnPrimary,
+                size: AppSpacing.iconSm,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildEditForm() {
+  Widget _buildEditForm(AppColors colors) {
     return Column(
       children: [
-        // First Name Field
-        CustomTextField(
-          label: 'First Name',
+        AppTextField(
+          labelText: 'First Name',
           controller: _firstNameController,
+          prefixIcon: Icons.person_outline,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter your first name';
             }
             return null;
           },
+          semanticLabel: 'First name input field',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
 
-        // Last Name Field
-        CustomTextField(
-          label: 'Last Name',
+        AppTextField(
+          labelText: 'Last Name',
           controller: _lastNameController,
+          prefixIcon: Icons.person_outline,
           validator: (value) {
             if (value == null || value.isEmpty) {
               return 'Please enter your last name';
             }
             return null;
           },
+          semanticLabel: 'Last name input field',
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppSpacing.lg),
 
-        // Email Field (disabled)
-        CustomTextField(
-          label: 'Email',
+        AppTextField(
+          labelText: 'Email',
           controller: _emailController,
+          prefixIcon: Icons.email_outlined,
           enabled: false,
+          helperText: 'Email cannot be changed',
+          semanticLabel: 'Email address (read only)',
         ),
       ],
     );
   }
 
-  Widget _buildEditButtons(ApiAuthProvider authProvider) {
+  Widget _buildEditButtons(ApiAuthProvider authProvider, AppColors colors) {
     return Row(
       children: [
         Expanded(
-          child: CustomButton(
-            text: 'Cancel',
+          child: AppButton(
+            label: 'Cancel',
             onPressed: () {
               setState(() {
                 _isEditing = false;
@@ -822,19 +907,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _loadUserData();
               });
             },
-            isOutlined: true,
-            height: 50,
-            borderRadius: 12,
+            variant: AppButtonVariant.outlined,
+            size: AppButtonSize.large,
+            semanticLabel: 'Cancel editing profile',
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: AppSpacing.lg),
         Expanded(
-          child: CustomButton(
-            text: 'Save',
+          child: AppButton(
+            label: 'Save',
             onPressed: _saveProfile,
             isLoading: authProvider.isLoading,
-            height: 50,
-            borderRadius: 12,
+            size: AppButtonSize.large,
+            semanticLabel: 'Save profile changes',
           ),
         ),
       ],

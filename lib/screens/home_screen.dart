@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_speed_dial/flutter_speed_dial.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/chat_provider.dart';
 import '../services/improved_file_upload_service.dart';
 import '../services/screen_state_manager.dart';
-import '../widgets/search_chat_delegate.dart';
+
 import '../widgets/modern_bottom_navigation.dart';
+import '../design_system/components/search_bar_widget.dart';
+import '../design_system/components/app_speed_dial.dart';
+import '../design_system/tokens/app_spacing.dart';
 import 'chat/create_group_screen.dart';
 import 'chat/create_private_chat_screen.dart';
 import 'chat/group_chat_list.dart';
@@ -21,18 +23,40 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+    with AutomaticKeepAliveClientMixin {
   int _currentIndex = 0;
+  final TextEditingController _searchController = TextEditingController();
 
   // Keys to force rebuild of list widgets when needed
   Key _privateChatListKey = UniqueKey();
   Key _groupChatListKey = UniqueKey();
+
+  // State preservation for orientation changes
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
     // Set initial screen state
     _updateScreenState();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    // Search query changed - can be used for filtering
+    setState(() {});
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {});
   }
 
   void _updateScreenState() {
@@ -63,6 +87,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Required for AutomaticKeepAliveClientMixin to preserve state
+    super.build(context);
+
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     final webSocketService = Provider.of<ImprovedFileUploadService>(
       context,
@@ -71,6 +98,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentUserId =
         chatProvider
             .currentUserId; // Assuming currentUserId is stored in ChatProvider
+
+    // Get responsive layout information
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isDesktop = screenWidth >= AppSpacing.breakpointTablet;
 
     final screens = <Widget>[
       PrivateChatList(
@@ -88,32 +119,88 @@ class _HomeScreenState extends State<HomeScreen> {
       const ProfileScreen(),
       const SettingsScreen(),
     ];
-    final titles = ['Chats', 'Groups', 'Profile', 'Settings'];
+
+    // Build the main content with responsive constraints
+    Widget buildResponsiveContent(Widget content) {
+      if (isDesktop) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 800),
+            child: content,
+          ),
+        );
+      }
+      return content;
+    }
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(titles[_currentIndex]),
-        actions: [
-          if (_currentIndex < 2)
-            IconButton(
-              icon: const Icon(Icons.search),
-              onPressed: () {
-                showSearch(
-                  context: context,
-                  delegate: SearchChatDelegate(
-                    chatRooms:
-                        _currentIndex == 0
-                            ? chatProvider.privateChatRooms
-                            : chatProvider.groupChatRooms,
-                    chatProvider: chatProvider,
-                    currentUserId: currentUserId,
+      body: SafeArea(
+        child:
+            _currentIndex < 2
+                ? buildResponsiveContent(
+                  Column(
+                    children: [
+                      // Search bar for chat/group tabs
+                      // Header Row
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                          vertical: AppSpacing.md,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              [
+                                'Chats',
+                                'Groups',
+                                'Profile',
+                                'Settings',
+                              ][_currentIndex],
+                              style: Theme.of(context).textTheme.headlineMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            if (_currentIndex < 2)
+                              Row(
+                                children: [
+                                  _buildHeaderActionButton(
+                                    context,
+                                    Icons.camera_alt,
+                                    () {},
+                                  ),
+                                  const SizedBox(width: AppSpacing.sm),
+                                  _buildHeaderActionButton(
+                                    context,
+                                    Icons.edit,
+                                    _currentIndex == 0
+                                        ? _goToCreatePrivateChat
+                                        : _goToCreateGroupChat,
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: isDesktop ? AppSpacing.lg : 0,
+                        ),
+                        child: SearchBarWidget(
+                          controller: _searchController,
+                          hintText: 'Search',
+                          isLoading: false,
+                          onChanged: _onSearchChanged,
+                          onClear: _clearSearch,
+                          semanticLabel: 'Search',
+                        ),
+                      ),
+                      // Chat/Group list
+                      Expanded(child: screens[_currentIndex]),
+                    ],
                   ),
-                );
-              },
-            ),
-        ],
+                )
+                : buildResponsiveContent(screens[_currentIndex]),
       ),
-      body: screens[_currentIndex],
       floatingActionButton: _currentIndex < 2 ? _buildSpeedDial() : null,
       bottomNavigationBar: ModernBottomNavigation(
         currentIndex: _currentIndex,
@@ -155,48 +242,49 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  SpeedDial _buildSpeedDial() {
-    final theme = Theme.of(context);
-    return SpeedDial(
+  Widget _buildSpeedDial() {
+    final mediaQuery = MediaQuery.of(context);
+
+    return AppSpeedDial(
       icon: Icons.add_rounded,
       activeIcon: Icons.close_rounded,
-      backgroundColor: theme.colorScheme.primary,
-      foregroundColor: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      overlayOpacity: 0.5,
-      elevation: 8,
-      animationCurve: Curves.easeInOut,
-      animationDuration: const Duration(milliseconds: 300),
+      semanticLabel: 'Create new chat or group',
+      backdropOpacity: 0.6,
+      // Respect safe areas - add extra margin for bottom navigation
+      marginBottom: mediaQuery.padding.bottom + 80,
       children: [
-        SpeedDialChild(
-          child: const Icon(Icons.person_add_rounded, color: Colors.white),
+        AppSpeedDialChild(
+          icon: Icons.person_add_rounded,
           label: 'New Chat',
-          backgroundColor: theme.colorScheme.primary,
-          labelBackgroundColor: theme.colorScheme.surface,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
           onTap: () => _goToCreatePrivateChat(),
         ),
-        SpeedDialChild(
-          child: const Icon(Icons.group_add_rounded, color: Colors.white),
+        AppSpeedDialChild(
+          icon: Icons.group_add_rounded,
           label: 'New Group',
-          backgroundColor: theme.colorScheme.primary,
-          labelBackgroundColor: theme.colorScheme.surface,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
           onTap: () => _goToCreateGroupChat(),
         ),
       ],
+    );
+  }
+
+  Widget _buildHeaderActionButton(
+    BuildContext context,
+    IconData icon,
+    VoidCallback onTap,
+  ) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF3A3B3C) : const Color(0xFFF0F2F5),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        icon: Icon(icon, size: 20, color: isDark ? Colors.white : Colors.black),
+        onPressed: onTap,
+        padding: EdgeInsets.zero,
+      ),
     );
   }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:provider/provider.dart';
+import '../../design_system/tokens/app_spacing.dart';
+import '../../design_system/components/responsive_container.dart';
 import '../../utils/logger.dart';
 import '../../core/services/token_service.dart';
 import '../../widgets/shimmer_widgets.dart';
@@ -297,48 +299,57 @@ class _TextFileViewerScreenState extends State<TextFileViewerScreen> {
 
     return Column(
       children: [
-        // File info bar
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            border: Border(
-              bottom: BorderSide(
-                color: Theme.of(context).dividerColor,
-                width: 1,
+        // File info bar - centered on desktop
+        ResponsiveContainer(
+          maxWidth: ResponsiveMaxWidths.textViewer,
+          padding: EdgeInsets.zero,
+          child: Container(
+            width: double.infinity,
+            padding: EdgeInsets.symmetric(
+              horizontal: ResponsiveLayout.getHorizontalPadding(context),
+              vertical: 8,
+            ),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).dividerColor,
+                  width: 1,
+                ),
               ),
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                _getFileIcon(),
-                size: 20,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '${_getDisplayFileName()} • ${_fileContent!.length} characters • ${_fileContent!.split('\n').length} lines',
+            child: Row(
+              children: [
+                Icon(
+                  _getFileIcon(),
+                  size: 20,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${_getDisplayFileName()} • ${_fileContent!.length} characters • ${_fileContent!.split('\n').length} lines',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                Text(
+                  'Font: ${_fontSize.toInt()}px',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
-              ),
-              Text(
-                'Font: ${_fontSize.toInt()}px',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        // File content
+        // File content - wrapped with ResponsiveContainer for max-width 800px
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
+          child: ResponsiveContainer(
+            maxWidth: ResponsiveMaxWidths.textViewer,
+            scrollable: true,
+            padding: ResponsiveLayout.getScreenPadding(context),
             child: SelectableText(
               _fileContent!,
               style: _getTextStyle(),

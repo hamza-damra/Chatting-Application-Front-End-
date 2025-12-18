@@ -4,6 +4,8 @@ import '../../models/chat_room.dart';
 import '../../models/user_model.dart';
 import '../../widgets/group_actions_widget.dart';
 import '../../providers/chat_provider.dart';
+import '../../design_system/tokens/app_spacing.dart';
+import '../../design_system/components/responsive_container.dart';
 
 /// Screen for group settings and management
 class GroupSettingsScreen extends StatefulWidget {
@@ -77,8 +79,13 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: _loadParticipants,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20.0),
+        child: ResponsiveContainer(
+          maxWidth: ResponsiveMaxWidths.profileSettings,
+          scrollable: true,
+          padding: EdgeInsets.symmetric(
+            horizontal: ResponsiveLayout.getHorizontalPadding(context),
+            vertical: AppSpacing.xl,
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -97,7 +104,7 @@ class _GroupSettingsScreenState extends State<GroupSettingsScreen> {
 
               const SizedBox(height: 24),
 
-              // Actions Section
+              // Actions Section - adapts layout based on screen width
               _buildModernActionsSection(theme),
 
               const SizedBox(height: 20),

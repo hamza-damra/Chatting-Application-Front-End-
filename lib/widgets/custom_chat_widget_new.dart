@@ -15,6 +15,7 @@ import '../utils/url_utils.dart';
 import '../utils/file_type_helper.dart';
 import '../screens/file_viewers/text_file_viewer_screen.dart';
 import '../widgets/blocking_aware_chat_input.dart';
+import '../design_system/tokens/app_spacing.dart';
 import 'chat_image_thumbnail.dart';
 import 'video_player_widget.dart';
 import 'scroll_to_bottom_button.dart';
@@ -49,7 +50,8 @@ class CustomChatWidgetNew extends StatefulWidget {
   State<CustomChatWidgetNew> createState() => _CustomChatWidgetNewState();
 }
 
-class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
+class _CustomChatWidgetNewState extends State<CustomChatWidgetNew>
+    with AutomaticKeepAliveClientMixin {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _isAttachmentMenuOpen = false;
@@ -65,6 +67,10 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
   bool _isNearBottom = true;
   static const double _bottomThreshold =
       100.0; // Distance from bottom to consider "near bottom"
+
+  // State preservation for orientation changes
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -576,6 +582,9 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
 
   @override
   Widget build(BuildContext context) {
+    // Required for AutomaticKeepAliveClientMixin to preserve state
+    super.build(context);
+    
     return Consumer<MessagePaginationProvider>(
       builder: (context, paginationProvider, child) {
         return Column(
@@ -583,7 +592,15 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
             Expanded(
               child: Stack(
                 children: [
-                  _buildMessagesList(paginationProvider),
+                  // Wrap message list with ResponsiveContainer for centering on desktop
+                  Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: ResponsiveMaxWidths.chatScreen,
+                      ),
+                      child: _buildMessagesList(paginationProvider),
+                    ),
+                  ),
                   // Scroll to bottom button
                   if (_showScrollToBottomButton)
                     Positioned(
@@ -599,7 +616,15 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
             ),
             if (_isUploading) _buildProgressIndicator(),
             if (_isAttachmentMenuOpen) _buildProfessionalAttachmentMenu(),
-            _buildChatInput(),
+            // Wrap input area with responsive constraints for centering on desktop
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: ResponsiveMaxWidths.chatScreen,
+                ),
+                child: _buildChatInput(),
+              ),
+            ),
           ],
         );
       },
@@ -672,9 +697,17 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     }
 
     // Show messages list with pagination
+    // Use responsive padding - larger on tablet/desktop for better readability
+    final responsivePadding = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 16.0,
+      tablet: 24.0,
+      desktop: 32.0,
+    );
+
     return ListView.builder(
       controller: _scrollController,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(responsivePadding),
       itemCount:
           paginationProvider.messages.length +
           (paginationProvider.isLoadingMore ? 1 : 0),
@@ -1213,7 +1246,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     if (message.attachmentUrl != null && message.attachmentUrl!.isNotEmpty) {
       String videoUrl = message.attachmentUrl!;
       if (!videoUrl.startsWith('http')) {
-        videoUrl = 'http://abusaker.zapto.org:8080${message.attachmentUrl!}';
+        videoUrl = 'http://archivingalquds.ddns.net:8080${message.attachmentUrl!}';
       }
       return SizedBox(
         width: 240,
@@ -1276,7 +1309,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
       // Method 1: Use downloadUrl if available (new backend feature)
       if (message.downloadUrl != null && message.downloadUrl!.isNotEmpty) {
         String fullUrl =
-            'http://abusaker.zapto.org:8080${message.downloadUrl!}';
+            'http://archivingalquds.ddns.net:8080${message.downloadUrl!}';
         AppLogger.i(
           'CustomChatWidgetNew',
           'Using downloadUrl from message: $fullUrl',
@@ -1313,7 +1346,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
         }
 
         // If it's a relative path, construct the full URL
-        String fullUrl = 'http://abusaker.zapto.org:8080$attachmentUrl';
+        String fullUrl = 'http://archivingalquds.ddns.net:8080$attachmentUrl';
         AppLogger.i(
           'CustomChatWidgetNew',
           'Constructed URL from attachmentUrl: $fullUrl',
@@ -1417,7 +1450,7 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     try {
       // Use the new message-based download endpoint from the backend
       String downloadUrl =
-          'http://abusaker.zapto.org:8080/api/files/message/$messageId';
+          'http://archivingalquds.ddns.net:8080/api/files/message/$messageId';
       AppLogger.i(
         'CustomChatWidgetNew',
         'Fetched video URL from backend: $downloadUrl',
@@ -2076,11 +2109,21 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
     }
   }
 
-  /// Get padding for message based on content type and size
+  /// Get padding for message based on content type, size, and screen size
+  /// Uses responsive padding - larger on tablet/desktop for better readability
   EdgeInsets _getPaddingForMessage(Message message) {
+    // Get responsive padding multiplier based on screen size
+    // Mobile: 1.0x, Tablet: 1.25x, Desktop: 1.5x
+    final paddingMultiplier = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 1.0,
+      tablet: 1.25,
+      desktop: 1.5,
+    );
+
     // For attachments, use consistent padding
     if (message.attachmentUrl != null) {
-      return const EdgeInsets.all(8);
+      return EdgeInsets.all(8 * paddingMultiplier);
     }
 
     final content = message.content ?? '';
@@ -2088,16 +2131,28 @@ class _CustomChatWidgetNewState extends State<CustomChatWidgetNew> {
 
     if (contentLength <= 5) {
       // Very short messages - compact padding
-      return const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+      return EdgeInsets.symmetric(
+        horizontal: 12 * paddingMultiplier,
+        vertical: 8 * paddingMultiplier,
+      );
     } else if (contentLength <= 15) {
       // Short messages - slightly more padding
-      return const EdgeInsets.symmetric(horizontal: 14, vertical: 9);
+      return EdgeInsets.symmetric(
+        horizontal: 14 * paddingMultiplier,
+        vertical: 9 * paddingMultiplier,
+      );
     } else if (contentLength <= 50) {
       // Medium messages - standard padding
-      return const EdgeInsets.symmetric(horizontal: 16, vertical: 10);
+      return EdgeInsets.symmetric(
+        horizontal: 16 * paddingMultiplier,
+        vertical: 10 * paddingMultiplier,
+      );
     } else {
       // Long messages - generous padding for readability
-      return const EdgeInsets.symmetric(horizontal: 16, vertical: 12);
+      return EdgeInsets.symmetric(
+        horizontal: 16 * paddingMultiplier,
+        vertical: 12 * paddingMultiplier,
+      );
     }
   }
 

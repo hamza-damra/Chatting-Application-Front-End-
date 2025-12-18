@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../theme/app_theme.dart';
+import '../design_system/theme/app_theme_data.dart';
 
 /// Provider to manage app theme state
 class ThemeProvider with ChangeNotifier {
@@ -8,10 +8,28 @@ class ThemeProvider with ChangeNotifier {
   
   ThemeMode _themeMode = ThemeMode.system;
   
+  // Cache theme configs for performance
+  final AppThemeConfig _lightConfig = AppThemeConfig.light();
+  final AppThemeConfig _darkConfig = AppThemeConfig.dark();
+  
   ThemeMode get themeMode => _themeMode;
   
-  ThemeData get lightTheme => AppTheme.lightTheme();
-  ThemeData get darkTheme => AppTheme.darkTheme();
+  /// Get the light theme configuration
+  AppThemeConfig get lightConfig => _lightConfig;
+  
+  /// Get the dark theme configuration
+  AppThemeConfig get darkConfig => _darkConfig;
+  
+  /// Get the light ThemeData
+  ThemeData get lightTheme => _lightConfig.toThemeData();
+  
+  /// Get the dark ThemeData
+  ThemeData get darkTheme => _darkConfig.toThemeData();
+  
+  /// Get the current theme config based on context brightness
+  AppThemeConfig getConfig(BuildContext context) {
+    return isDarkMode(context) ? _darkConfig : _lightConfig;
+  }
   
   ThemeProvider() {
     _loadThemePreference();

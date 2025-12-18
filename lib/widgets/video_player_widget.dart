@@ -40,7 +40,7 @@ class _VideoPlayerWidgetState extends State<VideoPlayerWidget> {
 
     // Check if this is a server URL that needs authentication
     final needsAuth =
-        normalizedUrl.startsWith('http://abusaker.zapto.org:8080') ||
+        normalizedUrl.startsWith('http://archivingalquds.ddns.net:8080') ||
         normalizedUrl.startsWith('http://localhost:8080') ||
         normalizedUrl.startsWith('https://');
 

@@ -1,8 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
 
-/// Collection of reusable shimmer loading widgets for different use cases
+/// Collection of reusable shimmer loading widgets for different use cases.
+/// 
+/// Performance optimized:
+/// - Uses RepaintBoundary to isolate shimmer animations
+/// - Consistent animation duration for smooth performance
+/// - Minimizes widget rebuilds with const constructors where possible
+/// 
+/// Requirements: 10.3
 class ShimmerWidgets {
+  /// Default shimmer animation period for consistent performance.
+  static const Duration _shimmerPeriod = Duration(milliseconds: 1500);
+
   /// Get theme-aware shimmer colors
   static Map<String, Color> _getShimmerColors(
     BuildContext? context, {
@@ -25,13 +35,19 @@ class ShimmerWidgets {
     }
   }
 
+  /// Wraps a shimmer widget with RepaintBoundary for performance optimization.
+  /// This isolates the shimmer animation repaints from parent widgets.
+  static Widget _wrapWithRepaintBoundary(Widget shimmerWidget) {
+    return RepaintBoundary(child: shimmerWidget);
+  }
+
   /// Get theme-aware container color
   static Color _getContainerColor(BuildContext? context) {
     final isDark =
         context != null
             ? Theme.of(context).brightness == Brightness.dark
             : false;
-    return isDark ? Colors.grey[850]! : Colors.white;
+    return isDark ? const Color(0xFF303030) : Colors.white;
   }
 
   /// Basic circular shimmer for replacing CircularProgressIndicator
@@ -47,15 +63,18 @@ class ShimmerWidgets {
       highlightColor: highlightColor,
     );
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: _getContainerColor(context),
-          shape: BoxShape.circle,
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: _getContainerColor(context),
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );
@@ -74,30 +93,33 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: containerColor,
-              shape: BoxShape.circle,
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: containerColor,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: 120,
-            height: 16,
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(8),
+            const SizedBox(height: 16),
+            Container(
+              width: 120,
+              height: 16,
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -117,15 +139,18 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: containerColor,
-          shape: BoxShape.circle,
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: containerColor,
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );
@@ -147,15 +172,18 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: containerColor,
-          borderRadius: borderRadius ?? BorderRadius.circular(8),
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: containerColor,
+            borderRadius: borderRadius ?? BorderRadius.circular(8),
+          ),
         ),
       ),
     );
@@ -182,20 +210,23 @@ class ShimmerWidgets {
                 Colors.blue.withValues(alpha: 0.1))
             : _getShimmerColors(context)['highlight']!;
 
-    return Shimmer.fromColors(
-      baseColor: baseColor,
-      highlightColor: highlightColor,
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          color: containerColor,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(
-          Icons.image,
-          size: 40,
-          color: containerColor.withValues(alpha: 0.54),
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: baseColor,
+        highlightColor: highlightColor,
+        period: _shimmerPeriod,
+        child: Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            color: containerColor,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(
+            Icons.image,
+            size: 40,
+            color: containerColor.withValues(alpha: 0.54),
+          ),
         ),
       ),
     );
@@ -231,80 +262,83 @@ class ShimmerWidgets {
           width: 1,
         ),
       ),
-      child: Shimmer.fromColors(
-        baseColor: colors['base']!,
-        highlightColor: colors['highlight']!,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              // Professional Avatar
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: containerColor,
-                  borderRadius: BorderRadius.circular(8),
+      child: _wrapWithRepaintBoundary(
+        Shimmer.fromColors(
+          baseColor: colors['base']!,
+          highlightColor: colors['highlight']!,
+          period: _shimmerPeriod,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // Professional Avatar
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: containerColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Name
-                        Container(
-                          width: 140,
-                          height: 16,
-                          decoration: BoxDecoration(
-                            color: containerColor,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                        ),
-                        // Timestamp
-                        Container(
-                          width: 40,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: containerColor,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        // Last message
-                        Expanded(
-                          child: Container(
-                            height: 14,
+                const SizedBox(width: 16),
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Name
+                          Container(
+                            width: 140,
+                            height: 16,
                             decoration: BoxDecoration(
                               color: containerColor,
-                              borderRadius: BorderRadius.circular(7),
+                              borderRadius: BorderRadius.circular(8),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Unread badge placeholder
-                        Container(
-                          width: 20,
-                          height: 20,
-                          decoration: BoxDecoration(
-                            color: containerColor,
-                            shape: BoxShape.circle,
+                          // Timestamp
+                          Container(
+                            width: 40,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: containerColor,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          // Last message
+                          Expanded(
+                            child: Container(
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: containerColor,
+                                borderRadius: BorderRadius.circular(7),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Unread badge placeholder
+                          Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              color: containerColor,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -324,35 +358,38 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(12),
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.description,
+                size: 40,
+                color: containerColor.withValues(alpha: 0.54),
+              ),
             ),
-            child: Icon(
-              Icons.description,
-              size: 40,
-              color: containerColor.withValues(alpha: 0.54),
+            const SizedBox(height: 16),
+            Container(
+              width: 150,
+              height: 16,
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            width: 150,
-            height: 16,
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -370,44 +407,47 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 120,
-            height: 120,
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(16),
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Icon(
+                Icons.play_circle_outline,
+                size: 60,
+                color: containerColor.withValues(alpha: 0.54),
+              ),
             ),
-            child: Icon(
-              Icons.play_circle_outline,
-              size: 60,
-              color: containerColor.withValues(alpha: 0.54),
+            const SizedBox(height: 20),
+            Container(
+              width: 200,
+              height: 8,
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(4),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
-          Container(
-            width: 200,
-            height: 8,
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(4),
+            const SizedBox(height: 8),
+            Container(
+              width: 100,
+              height: 16,
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: 100,
-            height: 16,
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -427,35 +467,38 @@ class ShimmerWidgets {
 
     return Container(
       color: Colors.black,
-      child: Shimmer.fromColors(
-        baseColor: colors['base']!,
-        highlightColor: colors['highlight']!,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(16),
+      child: _wrapWithRepaintBoundary(
+        Shimmer.fromColors(
+          baseColor: colors['base']!,
+          highlightColor: colors['highlight']!,
+          period: _shimmerPeriod,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  Icons.image,
+                  size: 50,
+                  color: containerColor.withValues(alpha: 0.54),
+                ),
               ),
-              child: Icon(
-                Icons.image,
-                size: 50,
-                color: containerColor.withValues(alpha: 0.54),
+              const SizedBox(height: 24),
+              Container(
+                width: 120,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-            Container(
-              width: 120,
-              height: 16,
-              decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -474,74 +517,77 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Profile Image
-            Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                color: containerColor,
-                shape: BoxShape.circle,
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // Profile Image
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  shape: BoxShape.circle,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // User Name
-            Container(
-              width: 200,
-              height: 24,
-              decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(12),
+              // User Name
+              Container(
+                width: 200,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            // User Email
-            Container(
-              width: 160,
-              height: 16,
-              decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(8),
+              // User Email
+              Container(
+                width: 160,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Profile Info Cards
-            ...List.generate(
-              3,
-              (index) => Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Container(
-                  width: double.infinity,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: containerColor,
-                    borderRadius: BorderRadius.circular(8),
+              // Profile Info Cards
+              ...List.generate(
+                3,
+                (index) => Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Container(
+                    width: double.infinity,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      color: containerColor,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Edit Profile Button
-            Container(
-              width: double.infinity,
-              height: 50,
-              decoration: BoxDecoration(
-                color: containerColor,
-                borderRadius: BorderRadius.circular(25),
+              // Edit Profile Button
+              Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: containerColor,
+                  borderRadius: BorderRadius.circular(25),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -561,15 +607,18 @@ class ShimmerWidgets {
     );
     final containerColor = _getContainerColor(context);
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: containerColor,
-          shape: BoxShape.circle,
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: containerColor,
+            shape: BoxShape.circle,
+          ),
         ),
       ),
     );
@@ -592,65 +641,68 @@ class ShimmerWidgets {
             ? Theme.of(context).brightness == Brightness.dark
             : false;
 
-    return Shimmer.fromColors(
-      baseColor: colors['base']!,
-      highlightColor: colors['highlight']!,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: containerColor,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color:
-                  isDark
-                      ? Colors.black.withValues(alpha: 0.3)
-                      : Colors.grey.withValues(alpha: 0.1),
-              spreadRadius: 1,
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // Icon placeholder
-            Container(
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.grey[600] : Colors.grey[400],
-                borderRadius: BorderRadius.circular(4),
+    return _wrapWithRepaintBoundary(
+      Shimmer.fromColors(
+        baseColor: colors['base']!,
+        highlightColor: colors['highlight']!,
+        period: _shimmerPeriod,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: containerColor,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: [
+              BoxShadow(
+                color:
+                    isDark
+                        ? Colors.black.withValues(alpha: 0.3)
+                        : Colors.grey.withValues(alpha: 0.1),
+                spreadRadius: 1,
+                blurRadius: 3,
+                offset: const Offset(0, 1),
               ),
-            ),
-            const SizedBox(width: 16),
-            // Content
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 12,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[600] : Colors.grey[400],
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    height: 16,
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.grey[600] : Colors.grey[400],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                ],
+            ],
+          ),
+          child: Row(
+            children: [
+              // Icon placeholder
+              Container(
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.grey[600] : Colors.grey[400],
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+              // Content
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 60,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.grey[600] : Colors.grey[400],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

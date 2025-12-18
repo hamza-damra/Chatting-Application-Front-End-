@@ -5,6 +5,8 @@ import '../../providers/chat_provider.dart';
 import '../../providers/api_auth_provider.dart';
 import '../../widgets/user_avatar.dart';
 import '../../utils/logger.dart';
+import '../../design_system/components/responsive_container.dart';
+import '../../design_system/tokens/app_spacing.dart';
 import 'chat_screen.dart';
 
 class CreatePrivateChatScreen extends StatefulWidget {
@@ -49,78 +51,137 @@ class _CreatePrivateChatScreenState extends State<CreatePrivateChatScreen> {
               return fullName.contains(query) || username.contains(query);
             }).toList();
 
+    // Get responsive horizontal padding for list items
+    final listItemHorizontalPadding = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: AppSpacing.lg,
+      tablet: AppSpacing.xxl,
+      desktop: AppSpacing.xxxl,
+    );
+
     return Scaffold(
-      appBar: AppBar(title: const Text('New Chat')),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search users...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon:
-                    _searchQuery.isNotEmpty
-                        ? IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            setState(() {
-                              _searchController.clear();
-                              _searchQuery = '';
-                            });
-                          },
-                        )
-                        : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+      body: SafeArea(
+        child: ResponsiveContainer(
+          maxWidth: ResponsiveMaxWidths.userList,
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              // Custom header row
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Text(
+                      'New Chat',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
-            ),
-          ),
-
-          // User list
-          Expanded(
-            child:
-                chatProvider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : filteredUsers.isEmpty
-                    ? Center(
-                      child: Text(
-                        _searchQuery.isEmpty
-                            ? 'No users available'
-                            : 'No users found',
-                        style: theme.textTheme.bodyLarge,
+              // Search bar
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Search users...',
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon:
+                        _searchQuery.isNotEmpty
+                            ? IconButton(
+                              icon: const Icon(Icons.clear),
+                              onPressed: () {
+                                setState(() {
+                                  _searchController.clear();
+                                  _searchQuery = '';
+                                });
+                              },
+                            )
+                            : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusFull,
                       ),
-                    )
-                    : ListView.builder(
-                      itemCount: filteredUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = filteredUsers[index];
-
-                        return ListTile(
-                          leading: UserAvatar(
-                            imageUrl: user.profilePicture,
-                            name: user.fullName,
-                            size: 40,
-                          ),
-                          title: Text(user.fullName),
-                          subtitle: Text(user.username),
-                          onTap:
-                              _isCreating
-                                  ? null
-                                  : () => _createPrivateChat(context, user),
-                        );
-                      },
                     ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusFull,
+                      ),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(
+                        AppSpacing.radiusFull,
+                      ),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor:
+                        theme.brightness == Brightness.dark
+                            ? const Color(0xFF353535)
+                            : const Color(0xFFF0F2F5),
+                  ),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchQuery = value;
+                    });
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+
+              // User list
+              Expanded(
+                child:
+                    chatProvider.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : filteredUsers.isEmpty
+                        ? Center(
+                          child: Text(
+                            _searchQuery.isEmpty
+                                ? 'No users available'
+                                : 'No users found',
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                        )
+                        : ListView.builder(
+                          itemCount: filteredUsers.length,
+                          itemBuilder: (context, index) {
+                            final user = filteredUsers[index];
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.symmetric(
+                                horizontal: listItemHorizontalPadding,
+                                vertical: AppSpacing.xs,
+                              ),
+                              leading: UserAvatar(
+                                imageUrl: user.profilePicture,
+                                name: user.fullName,
+                                size: 40,
+                              ),
+                              title: Text(user.fullName),
+                              subtitle: Text(user.username),
+                              onTap:
+                                  _isCreating
+                                      ? null
+                                      : () => _createPrivateChat(context, user),
+                            );
+                          },
+                        ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

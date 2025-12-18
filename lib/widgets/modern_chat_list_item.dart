@@ -4,8 +4,17 @@ import '../models/chat_room.dart';
 import '../providers/chat_provider.dart';
 import '../providers/user_status_provider.dart';
 import '../widgets/blocked_user_indicator.dart';
+import '../design_system/components/app_avatar.dart';
+import '../design_system/components/app_badge.dart';
+import '../design_system/tokens/app_colors.dart';
+import '../design_system/tokens/app_spacing.dart';
 import 'package:intl/intl.dart';
 
+/// A modern chat list item component that displays chat room information
+/// including avatar, name, last message preview, timestamp, unread badge,
+/// and online status indicator.
+///
+/// Requirements: 4.1, 5.3
 class ModernChatListItem extends StatelessWidget {
   final ChatRoom chatRoom;
   final int currentUserId;
@@ -23,7 +32,17 @@ class ModernChatListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final colors = isDark ? const DarkAppColors() : const LightAppColors();
     final isGroup = !chatRoom.isPrivate;
+
+    // Get responsive horizontal margin for list items
+    final horizontalMargin = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: AppSpacing.xl,
+      tablet: AppSpacing.xxl,
+      desktop: AppSpacing.xxxl,
+    );
 
     // Get the other user ID for blocking status check (for private chats)
     final otherUserId =
@@ -55,148 +74,141 @@ class ModernChatListItem extends StatelessWidget {
           });
         }
 
-        final chatListWidget = Container(
-          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.1),
-              width: 1,
+        final chatListWidget = Semantics(
+          button: true,
+          label: '$displayName chat${unreadCount > 0 ? ', $unreadCount unread messages' : ''}',
+          child: Container(
+            margin: EdgeInsets.symmetric(
+              horizontal: horizontalMargin,
+              vertical: AppSpacing.sm,
             ),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(12),
-            child: InkWell(
-              onTap: onTap,
-              onLongPress: onLongPress,
-              borderRadius: BorderRadius.circular(12),
-              splashColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-              highlightColor: theme.colorScheme.primary.withValues(alpha: 0.05),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
-                    // Professional Avatar with Online Status
-                    _buildAvatar(
-                      chatRoom: chatRoom,
-                      isGroup: isGroup,
-                      isOnline: isOnline,
-                      theme: theme,
-                    ),
-                    const SizedBox(width: 16),
-
-                    // Chat info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Chat name
-                              Expanded(
-                                child: Text(
-                                  displayName,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 17,
-                                    letterSpacing: -0.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-
-                              // Timestamp
-                              if (chatRoom.lastActivity != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color:
-                                        theme
-                                            .colorScheme
-                                            .surfaceContainerHighest,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    _formatTimestamp(chatRoom.lastActivity!),
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: theme.colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Subtitle and unread count
-                          Row(
-                            children: [
-                              // Subtitle (last message or member count)
-                              Expanded(
-                                child: Text(
-                                  _getSubtitle(chatRoom, isGroup),
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    fontSize: 15,
-                                    color:
-                                        unreadCount > 0
-                                            ? theme.colorScheme.onSurface
-                                            : theme
-                                                .colorScheme
-                                                .onSurfaceVariant,
-                                    fontWeight:
-                                        unreadCount > 0
-                                            ? FontWeight.w500
-                                            : FontWeight.w400,
-                                    letterSpacing: -0.1,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-
-                              const SizedBox(width: 12),
-
-                              // Unread count badge
-                              if (unreadCount > 0)
-                                Container(
-                                  constraints: const BoxConstraints(
-                                    minWidth: 24,
-                                    minHeight: 24,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.primary,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Text(
-                                    unreadCount > 99
-                                        ? '99+'
-                                        : unreadCount.toString(),
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.onPrimary,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                    textAlign: TextAlign.center,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
+            constraints: const BoxConstraints(
+              minWidth: 280, // Minimum width to prevent layout issues
+            ),
+            decoration: BoxDecoration(
+              color: colors.surface,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              border: Border.all(
+                color: colors.outline.withValues(alpha: 0.1),
+                width: 1,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+              child: InkWell(
+                onTap: onTap,
+                onLongPress: onLongPress,
+                borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                splashColor: colors.primary.withValues(alpha: 0.1),
+                highlightColor: colors.primary.withValues(alpha: 0.05),
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.lg),
+                  child: Row(
+                    children: [
+                      // Avatar using AppAvatar component
+                      AppAvatar(
+                        name: displayName,
+                        size: AppAvatarSize.medium,
+                        showOnlineIndicator: !isGroup,
+                        isOnline: isOnline,
+                        semanticLabel: '$displayName avatar',
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: AppSpacing.lg),
+
+                      // Chat info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                // Chat name - use Flexible to prevent overflow
+                                Flexible(
+                                  fit: FlexFit.tight,
+                                  child: Text(
+                                    displayName,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 17,
+                                      letterSpacing: -0.2,
+                                      color: colors.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+
+                                // Timestamp - fixed width, doesn't expand
+                                if (chatRoom.lastActivity != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: AppSpacing.sm),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: AppSpacing.sm,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: colors.surfaceElevated,
+                                        borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                                      ),
+                                      child: Text(
+                                        _formatTimestamp(chatRoom.lastActivity!),
+                                        style: theme.textTheme.bodySmall?.copyWith(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w500,
+                                          color: colors.textSecondary,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+
+                            // Subtitle and unread count
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Subtitle (last message or member count) - use Flexible to prevent overflow
+                                Flexible(
+                                  fit: FlexFit.tight,
+                                  child: Text(
+                                    _getSubtitle(chatRoom, isGroup),
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      fontSize: 15,
+                                      color: unreadCount > 0
+                                          ? colors.textPrimary
+                                          : colors.textSecondary,
+                                      fontWeight: unreadCount > 0
+                                          ? FontWeight.w500
+                                          : FontWeight.w400,
+                                      letterSpacing: -0.1,
+                                    ),
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+
+                                // Unread count badge using AppBadge component - fixed size
+                                if (unreadCount > 0)
+                                  Padding(
+                                    padding: const EdgeInsets.only(left: AppSpacing.md),
+                                    child: AppBadge.count(
+                                      count: unreadCount,
+                                      type: AppBadgeType.primary,
+                                      size: AppBadgeSize.medium,
+                                      semanticLabel: '$unreadCount unread messages',
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -213,58 +225,6 @@ class ModernChatListItem extends StatelessWidget {
 
         return chatListWidget;
       },
-    );
-  }
-
-  Widget _buildAvatar({
-    required ChatRoom chatRoom,
-    required bool isGroup,
-    required bool isOnline,
-    required ThemeData theme,
-  }) {
-    return Stack(
-      children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: theme.colorScheme.primary.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Center(
-            child: Icon(
-              isGroup ? Icons.group_rounded : Icons.person_rounded,
-              size: 20,
-              color: theme.colorScheme.primary,
-            ),
-          ),
-        ),
-        // Online status indicator for private chats
-        if (!isGroup)
-          Positioned(
-            right: 2,
-            bottom: 2,
-            child: Container(
-              width: 14,
-              height: 14,
-              decoration: BoxDecoration(
-                color: isOnline ? const Color(0xFF4CAF50) : Colors.grey[400],
-                shape: BoxShape.circle,
-                border: Border.all(color: theme.colorScheme.surface, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: (isOnline
-                            ? const Color(0xFF4CAF50)
-                            : Colors.grey[400]!)
-                        .withValues(alpha: 0.3),
-                    blurRadius: 3,
-                    offset: const Offset(0, 1),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
     );
   }
 

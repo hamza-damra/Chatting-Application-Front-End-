@@ -5,8 +5,12 @@ import 'package:vector/services/improved_file_upload_service.dart';
 import 'package:vector/screens/chat/chat_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../widgets/shimmer_widgets.dart';
 import '../../widgets/modern_chat_list_item.dart';
+import '../../design_system/states/empty_state_view.dart';
+import '../../design_system/states/error_state_view.dart';
+import '../../design_system/states/skeleton_tile.dart';
+import '../../design_system/components/responsive_container.dart';
+import '../../design_system/tokens/app_spacing.dart';
 
 class GroupChatList extends StatefulWidget {
   final ChatProvider chatProvider;
@@ -25,7 +29,7 @@ class GroupChatList extends StatefulWidget {
 }
 
 class _GroupChatListState extends State<GroupChatList>
-    with TickerProviderStateMixin {
+    with TickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   List<ChatRoom> _groupChatRooms = [];
   bool _isLoading = true;
   bool _hasError = false;
@@ -36,6 +40,13 @@ class _GroupChatListState extends State<GroupChatList>
   final Map<int, Animation<double>> _slideAnimations = {};
   final Map<int, Animation<double>> _fadeAnimations = {};
 
+  // Scroll controller for state preservation
+  final ScrollController _scrollController = ScrollController();
+
+  // State preservation for orientation changes
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +55,9 @@ class _GroupChatListState extends State<GroupChatList>
 
   @override
   void dispose() {
+    // Dispose scroll controller
+    _scrollController.dispose();
+    
     // Dispose all animation controllers
     for (final controller in _animationControllers.values) {
       controller.dispose();
@@ -143,74 +157,67 @@ class _GroupChatListState extends State<GroupChatList>
 
   @override
   Widget build(BuildContext context) {
+    // Required for AutomaticKeepAliveClientMixin to preserve state
+    super.build(context);
+    
+    // Loading state with skeleton tiles
     if (_isLoading) {
-      return ListView.builder(
-        itemCount: 8, // Show 8 shimmer items
-        itemBuilder:
-            (context, index) =>
-                ShimmerWidgets.listItemShimmer(context: context),
+      return ResponsiveContainer(
+        maxWidth: ResponsiveMaxWidths.chatList,
+        padding: EdgeInsets.zero,
+        child: ListView.builder(
+          itemCount: 8, // Show 8 skeleton items
+          itemBuilder: (context, index) => const SkeletonTile(
+            type: SkeletonTileType.groupItem,
+          ),
+        ),
       );
     }
 
+    // Error state with ErrorStateView
     if (_hasError) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              'Error loading group chats',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              _errorMessage,
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadGroupChats,
-              child: const Text('Retry'),
-            ),
-          ],
+      return ResponsiveContainer(
+        maxWidth: ResponsiveMaxWidths.chatList,
+        padding: EdgeInsets.zero,
+        child: ErrorStateView(
+          message: 'Error loading group chats',
+          details: _errorMessage,
+          onRetry: _loadGroupChats,
         ),
       );
     }
 
+    // Empty state with EmptyStateView
     if (_groupChatRooms.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.group, color: Colors.grey, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              'No group chats yet',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create a new group or join an existing one',
-              style: Theme.of(context).textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+      return EmptyStateView(
+        icon: Icons.group_outlined,
+        title: 'No group chats yet',
+        description: 'Create a new group or join an existing one',
+        actionLabel: 'Create Group',
+        onAction: () {
+          // Navigate to create group screen
+          Navigator.pushNamed(context, '/create-group');
+        },
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadGroupChats,
-      child: ListView.builder(
-        itemCount: _groupChatRooms.length,
-        itemBuilder: (context, index) {
-          final room = _groupChatRooms[index];
-          // Create animation controller for this room if it doesn't exist
-          _createAnimationController(room.id);
-          return _buildChatRoomItem(room);
-        },
+    // Loaded state with RefreshIndicator
+    // Uses scroll controller for state preservation across orientation changes
+    return ResponsiveContainer(
+      maxWidth: ResponsiveMaxWidths.chatList,
+      padding: EdgeInsets.zero,
+      child: RefreshIndicator(
+        onRefresh: _loadGroupChats,
+        child: ListView.builder(
+          controller: _scrollController,
+          itemCount: _groupChatRooms.length,
+          itemBuilder: (context, index) {
+            final room = _groupChatRooms[index];
+            // Create animation controller for this room if it doesn't exist
+            _createAnimationController(room.id);
+            return _buildChatRoomItem(room);
+          },
+        ),
       ),
     );
   }

@@ -4,6 +4,8 @@ import '../presentation/blocs/user_blocking/user_blocking_bloc.dart';
 import '../domain/models/blocked_user_model.dart';
 import '../core/di/service_locator.dart';
 import '../widgets/profile_image_widget.dart';
+import '../design_system/components/responsive_container.dart';
+import '../design_system/tokens/app_spacing.dart';
 
 class BlockedUsersScreen extends StatefulWidget {
   const BlockedUsersScreen({super.key});
@@ -63,8 +65,10 @@ class _BlockedUsersScreenState extends State<BlockedUsersScreen> {
             ),
           ),
         ),
-        body: Container(
-          color: theme.colorScheme.surface,
+        body: ResponsiveContainer(
+          maxWidth: ResponsiveMaxWidths.userList,
+          padding: EdgeInsets.zero,
+          backgroundColor: theme.colorScheme.surface,
           child: BlocConsumer<UserBlockingBloc, UserBlockingState>(
             listener: (context, state) {
               if (state is UserBlockingFailure) {

@@ -4,6 +4,8 @@ import '../../models/user_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/api_auth_provider.dart';
 import '../../widgets/user_avatar.dart';
+import '../../design_system/components/responsive_container.dart';
+import '../../design_system/tokens/app_spacing.dart';
 import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
 
 class AddParticipantsScreen extends StatefulWidget {
@@ -146,6 +148,14 @@ class _AddParticipantsScreenState extends State<AddParticipantsScreen> {
               return fullName.contains(query) || username.contains(query);
             }).toList();
 
+    // Get responsive horizontal padding for list items
+    final listItemHorizontalPadding = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: AppSpacing.lg,
+      tablet: AppSpacing.xxl,
+      desktop: AppSpacing.xxxl,
+    );
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Add Participants'),
@@ -166,102 +176,110 @@ class _AddParticipantsScreenState extends State<AddParticipantsScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search bar
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search users...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
+      body: ResponsiveContainer(
+        maxWidth: ResponsiveMaxWidths.userList,
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            // Search bar
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search users...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0),
+                  filled: true,
+                  fillColor: theme.colorScheme.surface,
                 ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                filled: true,
-                fillColor: theme.colorScheme.surface,
               ),
             ),
-          ),
 
-          // Selected users count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              children: [
-                Text('Select Users', style: theme.textTheme.titleMedium),
-                const SizedBox(width: 8),
-                Chip(
-                  label: Text('${_selectedUsers.length} selected'),
-                  backgroundColor:
-                      _selectedUsers.isNotEmpty
-                          ? theme.colorScheme.primary.withAlpha(26)
-                          : Colors.grey.withAlpha(26),
-                  labelStyle: TextStyle(
-                    color:
+            // Selected users count
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: listItemHorizontalPadding),
+              child: Row(
+                children: [
+                  Text('Select Users', style: theme.textTheme.titleMedium),
+                  const SizedBox(width: 8),
+                  Chip(
+                    label: Text('${_selectedUsers.length} selected'),
+                    backgroundColor:
                         _selectedUsers.isNotEmpty
-                            ? theme.colorScheme.primary
-                            : Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // User list
-          Expanded(
-            child:
-                chatProvider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : filteredUsers.isEmpty
-                    ? Center(
-                      child: Text(
-                        _searchQuery.isEmpty
-                            ? 'No users available to add'
-                            : 'No users found',
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    )
-                    : ListView.builder(
-                      itemCount: filteredUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = filteredUsers[index];
-                        final isSelected = _selectedUsers.contains(user);
-
-                        return ListTile(
-                          leading: UserAvatar(
-                            imageUrl: user.profilePicture,
-                            name: user.fullName,
-                            size: 40,
-                          ),
-                          title: Text(user.fullName),
-                          subtitle: Text(user.username),
-                          trailing:
-                              isSelected
-                                  ? Icon(
-                                    Icons.check_circle,
-                                    color: theme.colorScheme.primary,
-                                  )
-                                  : const Icon(
-                                    Icons.circle_outlined,
-                                    color: Colors.grey,
-                                  ),
-                          onTap: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selectedUsers.remove(user);
-                              } else {
-                                _selectedUsers.add(user);
-                              }
-                            });
-                          },
-                        );
-                      },
+                            ? theme.colorScheme.primary.withAlpha(26)
+                            : Colors.grey.withAlpha(26),
+                    labelStyle: TextStyle(
+                      color:
+                          _selectedUsers.isNotEmpty
+                              ? theme.colorScheme.primary
+                              : Colors.grey,
                     ),
-          ),
-        ],
+                  ),
+                ],
+              ),
+            ),
+
+            // User list
+            Expanded(
+              child:
+                  chatProvider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : filteredUsers.isEmpty
+                      ? Center(
+                        child: Text(
+                          _searchQuery.isEmpty
+                              ? 'No users available to add'
+                              : 'No users found',
+                          style: theme.textTheme.bodyLarge,
+                        ),
+                      )
+                      : ListView.builder(
+                        itemCount: filteredUsers.length,
+                        itemBuilder: (context, index) {
+                          final user = filteredUsers[index];
+                          final isSelected = _selectedUsers.contains(user);
+
+                          return ListTile(
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: listItemHorizontalPadding,
+                              vertical: AppSpacing.xs,
+                            ),
+                            leading: UserAvatar(
+                              imageUrl: user.profilePicture,
+                              name: user.fullName,
+                              size: 40,
+                            ),
+                            title: Text(user.fullName),
+                            subtitle: Text(user.username),
+                            trailing:
+                                isSelected
+                                    ? Icon(
+                                      Icons.check_circle,
+                                      color: theme.colorScheme.primary,
+                                    )
+                                    : const Icon(
+                                      Icons.circle_outlined,
+                                      color: Colors.grey,
+                                    ),
+                            onTap: () {
+                              setState(() {
+                                if (isSelected) {
+                                  _selectedUsers.remove(user);
+                                } else {
+                                  _selectedUsers.add(user);
+                                }
+                              });
+                            },
+                          );
+                        },
+                      ),
+            ),
+          ],
+        ),
       ),
     );
   }

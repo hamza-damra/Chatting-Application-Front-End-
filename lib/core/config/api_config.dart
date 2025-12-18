@@ -1,7 +1,7 @@
 class ApiConfig {
   // Base URL
   static const String baseUrl =
-      'http://abusaker.zapto.org:8080'; // For Android emulator
+      'http://archivingalquds.ddns.net:8080'; // For Android emulator
 
   // Auth endpoints
   static const String loginEndpoint = '/api/auth/login';
@@ -28,7 +28,7 @@ class ApiConfig {
   static const String messagesEndpoint = '/api/messages';
 
   // WebSocket endpoints
-  static const String webSocketEndpoint = 'ws://abusaker.zapto.org:8080/ws';
+  static const String webSocketEndpoint = 'ws://archivingalquds.ddns.net:8080/ws';
 
   // STOMP destinations
   static const String stompChatTopic = '/topic/chatrooms/';

@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
+import '../design_system/tokens/app_spacing.dart';
 import '../utils/logger.dart';
 
+/// Widget for displaying file attachments with responsive preview sizes.
+///
+/// Adapts preview size based on available width for optimal display
+/// across different screen sizes.
+///
+/// Requirements: 8.6
 class FileAttachmentWidget extends StatelessWidget {
   final String? attachmentUrl;
   final String? contentType;
   final Function()? onTap;
-  final double size;
+  final double? size;
   final bool showFileName;
   final String? fileName;
+  final bool useResponsiveSize;
 
   const FileAttachmentWidget({
     super.key,
     required this.attachmentUrl,
     this.contentType,
     this.onTap,
-    this.size = 200,
+    this.size,
     this.showFileName = true,
     this.fileName,
+    this.useResponsiveSize = true,
   });
 
   @override
@@ -28,11 +37,21 @@ class FileAttachmentWidget extends StatelessWidget {
     final fileType = _getFileType();
     final displayName = fileName ?? _getDisplayName();
     
+    // Calculate responsive size based on screen width
+    final effectiveSize = size ?? (useResponsiveSize 
+        ? ResponsiveLayout.value<double>(
+            context: context,
+            mobile: 160.0,
+            tablet: 200.0,
+            desktop: 240.0,
+          )
+        : 200.0);
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: size,
+          maxWidth: effectiveSize,
           minWidth: 120,
         ),
         decoration: BoxDecoration(
@@ -51,7 +70,7 @@ class FileAttachmentWidget extends StatelessWidget {
           children: [
             // File type icon
             Container(
-              height: size * 0.6,
+              height: effectiveSize * 0.6,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: _getColorForFileType(fileType),
@@ -63,7 +82,7 @@ class FileAttachmentWidget extends StatelessWidget {
               child: Center(
                 child: Icon(
                   _getIconForFileType(fileType),
-                  size: size * 0.3,
+                  size: effectiveSize * 0.3,
                   color: Colors.white,
                 ),
               ),

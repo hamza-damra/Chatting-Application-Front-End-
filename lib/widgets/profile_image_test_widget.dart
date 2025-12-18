@@ -78,7 +78,7 @@ class _ProfileImageTestWidgetState extends State<ProfileImageTestWidget> {
       }
 
       // Test 3: Direct HTTP request (mimicking Postman)
-      final url = 'http://abusaker.zapto.org:8080/api/users/me/profile-image';
+      final url = 'http://archivingalquds.ddns.net:8080/api/users/me/profile-image';
       final request = http.MultipartRequest('POST', Uri.parse(url));
 
       // Add headers exactly like Postman
@@ -186,7 +186,7 @@ Check console logs for detailed request/response info.
 
       // Test 1: File system test
       final fileSystemUrl =
-          'http://abusaker.zapto.org:8080/api/debug/file-system';
+          'http://archivingalquds.ddns.net:8080/api/debug/file-system';
       final fileSystemResponse = await http.get(
         Uri.parse(fileSystemUrl),
         headers: {
@@ -199,7 +199,7 @@ Check console logs for detailed request/response info.
       AppLogger.i('TEST', 'File system response: ${fileSystemResponse.body}');
 
       // Test 2: Auth test
-      final authUrl = 'http://abusaker.zapto.org:8080/api/debug/auth-test';
+      final authUrl = 'http://archivingalquds.ddns.net:8080/api/debug/auth-test';
       final authResponse = await http.get(
         Uri.parse(authUrl),
         headers: {
@@ -213,7 +213,7 @@ Check console logs for detailed request/response info.
 
       // Test 3: Debug profile image upload
       final debugUrl =
-          'http://abusaker.zapto.org:8080/api/debug/profile-image-debug';
+          'http://archivingalquds.ddns.net:8080/api/debug/profile-image-debug';
       final request = http.MultipartRequest('POST', Uri.parse(debugUrl));
 
       request.headers.addAll({

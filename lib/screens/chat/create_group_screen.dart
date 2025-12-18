@@ -4,6 +4,8 @@ import '../../models/user_model.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/api_auth_provider.dart';
 import '../../widgets/user_avatar.dart';
+import '../../design_system/tokens/app_spacing.dart';
+import '../../design_system/components/responsive_container.dart';
 import 'chat_screen.dart';
 
 class CreateGroupScreen extends StatefulWidget {
@@ -58,180 +60,205 @@ class _CreateGroupScreenState extends State<CreateGroupScreen> {
             .toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Create Group'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child:
-                _isCreating
-                    ? const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                    : TextButton(
-                      onPressed:
-                          _canCreateGroup()
-                              ? () => _createGroup(context)
-                              : null,
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor:
-                            _canCreateGroup()
-                                ? Colors.white.withValues(alpha: 0.1)
-                                : Colors.transparent,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: const Text(
-                        'Create',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Group info form
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  TextFormField(
-                    controller: _groupNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Group Name',
-                      hintText: 'Enter a name for your group',
-                      prefixIcon: Icon(Icons.group),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter a group name';
-                      }
-                      return null;
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
-                    controller: _groupImageController,
-                    decoration: const InputDecoration(
-                      labelText: 'Group Image URL (Optional)',
-                      hintText: 'Enter an image URL for your group',
-                      prefixIcon: Icon(Icons.image),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // Selected users count
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+      body: SafeArea(
+        child: ResponsiveContainer(
+          maxWidth: ResponsiveMaxWidths.createGroup,
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: [
+              // Custom header row
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.md,
+                ),
+                child: Row(
                   children: [
-                    Text(
-                      'Select Participants',
-                      style: theme.textTheme.titleMedium,
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back),
+                      onPressed: () => Navigator.pop(context),
                     ),
-                    const SizedBox(width: 8),
-                    Chip(
-                      label: Text('${_selectedUsers.length} selected'),
-                      backgroundColor:
-                          _selectedUsers.length >= 2
-                              ? theme.colorScheme.primary.withAlpha(26)
-                              : Colors.grey.withAlpha(26),
-                      labelStyle: TextStyle(
-                        color:
-                            _selectedUsers.length >= 2
-                                ? theme.colorScheme.primary
-                                : Colors.grey,
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Create Group',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
+                    _isCreating
+                        ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : TextButton(
+                          onPressed:
+                              _canCreateGroup()
+                                  ? () => _createGroup(context)
+                                  : null,
+                          style: TextButton.styleFrom(
+                            foregroundColor: theme.colorScheme.primary,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 8,
+                            ),
+                          ),
+                          child: Text(
+                            'Create',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color:
+                                  _canCreateGroup()
+                                      ? theme.colorScheme.primary
+                                      : Colors.grey,
+                            ),
+                          ),
+                        ),
                   ],
                 ),
-                if (_selectedUsers.length < 2)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4.0),
-                    child: Text(
-                      'Select at least 2 participants to create a group',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.error,
+              ),
+              // Group info form
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: ResponsiveLayout.getHorizontalPadding(context),
+                  vertical: AppSpacing.lg,
+                ),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: _groupNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Group Name',
+                          hintText: 'Enter a name for your group',
+                          prefixIcon: Icon(Icons.group),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return 'Please enter a group name';
+                          }
+                          return null;
+                        },
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _groupImageController,
+                        decoration: const InputDecoration(
+                          labelText: 'Group Image URL (Optional)',
+                          hintText: 'Enter an image URL for your group',
+                          prefixIcon: Icon(Icons.image),
+                        ),
+                      ),
+                    ],
                   ),
-              ],
-            ),
-          ),
+                ),
+              ),
 
-          // User list
-          Expanded(
-            child:
-                chatProvider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : availableUsers.isEmpty
-                    ? Center(
-                      child: Text(
-                        'No users available',
-                        style: theme.textTheme.bodyLarge,
-                      ),
-                    )
-                    : ListView.builder(
-                      itemCount: availableUsers.length,
-                      itemBuilder: (context, index) {
-                        final user = availableUsers[index];
-                        final isSelected = _selectedUsers.contains(user);
-
-                        return ListTile(
-                          leading: UserAvatar(
-                            imageUrl: user.profilePicture,
-                            name: user.fullName,
-                            size: 40,
+              // Selected users count
+              Padding(
+                padding: EdgeInsets.symmetric(
+                  horizontal: ResponsiveLayout.getHorizontalPadding(context),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Select Participants',
+                          style: theme.textTheme.titleMedium,
+                        ),
+                        const SizedBox(width: 8),
+                        Chip(
+                          label: Text('${_selectedUsers.length} selected'),
+                          backgroundColor:
+                              _selectedUsers.length >= 2
+                                  ? theme.colorScheme.primary.withAlpha(26)
+                                  : Colors.grey.withAlpha(26),
+                          labelStyle: TextStyle(
+                            color:
+                                _selectedUsers.length >= 2
+                                    ? theme.colorScheme.primary
+                                    : Colors.grey,
                           ),
-                          title: Text(user.fullName),
-                          subtitle: Text(user.username),
-                          trailing:
-                              isSelected
-                                  ? Icon(
-                                    Icons.check_circle,
-                                    color: theme.colorScheme.primary,
-                                  )
-                                  : const Icon(
-                                    Icons.circle_outlined,
-                                    color: Colors.grey,
-                                  ),
-                          onTap: () {
-                            setState(() {
-                              if (isSelected) {
-                                _selectedUsers.remove(user);
-                              } else {
-                                _selectedUsers.add(user);
-                              }
-                            });
-                          },
-                        );
-                      },
+                        ),
+                      ],
                     ),
+                    if (_selectedUsers.length < 2)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          'Select at least 2 participants to create a group',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // User list
+              Expanded(
+                child:
+                    chatProvider.isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : availableUsers.isEmpty
+                        ? Center(
+                          child: Text(
+                            'No users available',
+                            style: theme.textTheme.bodyLarge,
+                          ),
+                        )
+                        : ListView.builder(
+                          padding: EdgeInsets.symmetric(
+                            horizontal: ResponsiveLayout.getHorizontalPadding(
+                              context,
+                            ),
+                          ),
+                          itemCount: availableUsers.length,
+                          itemBuilder: (context, index) {
+                            final user = availableUsers[index];
+                            final isSelected = _selectedUsers.contains(user);
+
+                            return ListTile(
+                              leading: UserAvatar(
+                                imageUrl: user.profilePicture,
+                                name: user.fullName,
+                                size: 40,
+                              ),
+                              title: Text(user.fullName),
+                              subtitle: Text(user.username),
+                              trailing:
+                                  isSelected
+                                      ? Icon(
+                                        Icons.check_circle,
+                                        color: theme.colorScheme.primary,
+                                      )
+                                      : const Icon(
+                                        Icons.circle_outlined,
+                                        color: Colors.grey,
+                                      ),
+                              onTap: () {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedUsers.remove(user);
+                                  } else {
+                                    _selectedUsers.add(user);
+                                  }
+                                });
+                              },
+                            );
+                          },
+                        ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

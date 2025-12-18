@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../core/services/token_service.dart';
 import '../utils/logger.dart';
 import '../utils/url_utils.dart';
@@ -34,6 +36,8 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
   bool _hasError = false;
   String _errorMessage = '';
   File? _tempVideoFile;
+  String? _normalizedVideoUrl;
+  bool _useWebFallback = false;
 
   @override
   void initState() {
@@ -56,11 +60,6 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
       _chewieController?.dispose();
       _videoPlayerController?.dispose();
 
-      // Clean up previous temp file
-      if (_tempVideoFile != null && await _tempVideoFile!.exists()) {
-        await _tempVideoFile!.delete();
-      }
-
       // Get TokenService from context if not provided
       final tokenService =
           widget.tokenService ??
@@ -68,22 +67,45 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
 
       // Normalize the video URL
       final normalizedUrl = UrlUtils.normalizeImageUrl(widget.videoUrl);
+      _normalizedVideoUrl = normalizedUrl;
       AppLogger.d(
         'AuthenticatedVideoPlayer',
         'Normalized video URL: $normalizedUrl',
       );
 
-      // Download video with authentication
-      final videoBytes = await _downloadVideoWithAuth(
-        normalizedUrl,
-        tokenService,
-      );
+      if (kIsWeb) {
+        // On web, use network URL directly (CORS must be configured on server)
+        AppLogger.d(
+          'AuthenticatedVideoPlayer',
+          'Running on web, using network URL directly',
+        );
+        _videoPlayerController = VideoPlayerController.networkUrl(
+          Uri.parse(normalizedUrl),
+          httpHeaders:
+              tokenService?.accessToken != null
+                  ? {'Authorization': 'Bearer ${tokenService!.accessToken}'}
+                  : {},
+        );
+      } else {
+        // On mobile/desktop, download with auth and use local file
+        // Clean up previous temp file
+        if (_tempVideoFile != null && await _tempVideoFile!.exists()) {
+          await _tempVideoFile!.delete();
+        }
 
-      // Save to temporary file
-      _tempVideoFile = await _saveToTempFile(videoBytes);
+        // Download video with authentication
+        final videoBytes = await _downloadVideoWithAuth(
+          normalizedUrl,
+          tokenService,
+        );
 
-      // Initialize video player with local file
-      _videoPlayerController = VideoPlayerController.file(_tempVideoFile!);
+        // Save to temporary file
+        _tempVideoFile = await _saveToTempFile(videoBytes);
+
+        // Initialize video player with local file
+        _videoPlayerController = VideoPlayerController.file(_tempVideoFile!);
+      }
+
       await _videoPlayerController!.initialize();
 
       // Check if the widget is still mounted before creating Chewie controller
@@ -154,6 +176,10 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
           _isLoading = false;
           _hasError = true;
           _errorMessage = _getUserFriendlyErrorMessage(e.toString());
+          // On web, enable fallback to open in browser
+          if (kIsWeb) {
+            _useWebFallback = true;
+          }
         });
       }
     }
@@ -366,10 +392,46 @@ class _AuthenticatedVideoPlayerState extends State<AuthenticatedVideoPlayer> {
                   ).textTheme.bodySmall?.copyWith(color: Colors.red),
                 ),
                 const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _initializePlayer,
-                  child: const Text('Retry'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton(
+                      onPressed: _initializePlayer,
+                      child: const Text('Retry'),
+                    ),
+                    if (_useWebFallback && _normalizedVideoUrl != null) ...[
+                      const SizedBox(width: 12),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final url = Uri.parse(_normalizedVideoUrl!);
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(
+                              url,
+                              mode: LaunchMode.externalApplication,
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.open_in_new),
+                        label: const Text('Open in Browser'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+                if (_useWebFallback) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    'Video may not be supported in this browser. Try opening in a new tab.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
             ),
           ),

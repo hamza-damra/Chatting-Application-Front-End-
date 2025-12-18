@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/chat_provider.dart';
 import '../models/chat_room.dart';
 import '../utils/logger.dart';
+import '../design_system/components/responsive_dialog.dart';
 
 /// Widget for group actions like leaving a group
 class GroupActionsWidget extends StatefulWidget {
@@ -26,27 +27,15 @@ class _GroupActionsWidgetState extends State<GroupActionsWidget> {
 
   /// Show confirmation dialog before leaving group
   Future<bool> _showLeaveConfirmationDialog() async {
-    return await showDialog<bool>(
+    return await ResponsiveDialog.showConfirmation(
           context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text('Leave Group'),
-                content: Text(
-                  'Are you sure you want to leave "${widget.chatRoom.name}"?\n\n'
-                  'You will no longer receive messages from this group.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    style: TextButton.styleFrom(foregroundColor: Colors.red),
-                    child: const Text('Leave Group'),
-                  ),
-                ],
-              ),
+          title: 'Leave Group',
+          message:
+              'Are you sure you want to leave "${widget.chatRoom.name}"?\n\n'
+              'You will no longer receive messages from this group.',
+          confirmText: 'Leave Group',
+          cancelText: 'Cancel',
+          isDestructive: true,
         ) ??
         false;
   }
@@ -100,19 +89,16 @@ class _GroupActionsWidgetState extends State<GroupActionsWidget> {
 
   /// Show error dialog
   void _showErrorDialog(String message) {
-    showDialog(
+    ResponsiveDialog.show(
       context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text('Error'),
-            content: Text(message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
-              ),
-            ],
-          ),
+      title: const Text('Error'),
+      content: Text(message),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('OK'),
+        ),
+      ],
     );
   }
 

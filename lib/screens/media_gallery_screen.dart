@@ -5,6 +5,8 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import '../config/api_config.dart';
 import '../services/file_access_service.dart';
 import '../core/services/token_service.dart';
+import '../design_system/tokens/app_spacing.dart';
+import '../design_system/components/responsive_container.dart';
 import '../utils/logger.dart';
 import '../widgets/shimmer_widgets.dart';
 import '../widgets/image_viewer.dart';
@@ -390,27 +392,39 @@ class _MediaGalleryScreenState extends State<MediaGalleryScreen>
       );
     }
 
+    // Use responsive column count: 2 on mobile, 3 on tablet, 4+ on desktop
+    final columnCount = ResponsiveLayout.value<int>(
+      context: context,
+      mobile: 2,
+      tablet: 3,
+      desktop: 4,
+    );
+
     return RefreshIndicator(
       onRefresh: _loadFiles,
-      child: MasonryGridView.count(
-        crossAxisCount: 2,
-        mainAxisSpacing: 12,
-        crossAxisSpacing: 12,
-        padding: const EdgeInsets.all(16),
-        itemCount: filteredImages.length,
-        itemBuilder: (context, index) {
-          final filename = filteredImages[index];
-          final imageUrl =
-              '${ApiConfig.baseUrl}${ApiConfig.filesEndpoint}/category/image/$filename';
-          final heroTag = 'gallery_image_$filename';
+      child: ResponsiveContainer(
+        maxWidth: ResponsiveMaxWidths.mediaGallery,
+        padding: EdgeInsets.zero,
+        child: MasonryGridView.count(
+          crossAxisCount: columnCount,
+          mainAxisSpacing: 12,
+          crossAxisSpacing: 12,
+          padding: ResponsiveLayout.getScreenPadding(context),
+          itemCount: filteredImages.length,
+          itemBuilder: (context, index) {
+            final filename = filteredImages[index];
+            final imageUrl =
+                '${ApiConfig.baseUrl}${ApiConfig.filesEndpoint}/category/image/$filename';
+            final heroTag = 'gallery_image_$filename';
 
-          return _buildImageCard(
-            filename: filename,
-            imageUrl: imageUrl,
-            heroTag: heroTag,
-            index: index,
-          );
-        },
+            return _buildImageCard(
+              filename: filename,
+              imageUrl: imageUrl,
+              heroTag: heroTag,
+              index: index,
+            );
+          },
+        ),
       ),
     );
   }
@@ -660,13 +674,17 @@ class _MediaGalleryScreenState extends State<MediaGalleryScreen>
 
     return RefreshIndicator(
       onRefresh: _loadFiles,
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: filteredFiles.length,
-        itemBuilder: (context, index) {
-          final filename = filteredFiles[index];
-          return _buildFileCard(filename: filename, icon: icon, index: index);
-        },
+      child: ResponsiveContainer(
+        maxWidth: ResponsiveMaxWidths.mediaGallery,
+        padding: EdgeInsets.zero,
+        child: ListView.builder(
+          padding: ResponsiveLayout.getScreenPadding(context),
+          itemCount: filteredFiles.length,
+          itemBuilder: (context, index) {
+            final filename = filteredFiles[index];
+            return _buildFileCard(filename: filename, icon: icon, index: index);
+          },
+        ),
       ),
     );
   }

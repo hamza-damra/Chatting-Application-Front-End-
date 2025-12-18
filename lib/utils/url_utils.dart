@@ -35,7 +35,7 @@ class UrlUtils {
 
   // Get the current server URL
   static String getBaseUrl() {
-    // Use the API config base URL (abusaker.zapto.org)
+    // Use the API config base URL (archivingalquds.ddns.net)
     return ApiConfig.baseUrl;
   }
 
@@ -76,11 +76,23 @@ class UrlUtils {
       print('Normalizing URL: $url');
     }
 
+    // First, rewrite any old server URLs to the new server
+    String processedUrl = url;
+    if (url.contains('abusaker.zapto.org')) {
+      processedUrl = url.replaceAll(
+        'abusaker.zapto.org',
+        'archivingalquds.ddns.net',
+      );
+      if (kDebugMode) {
+        print('Rewrote old server URL to: $processedUrl');
+      }
+    }
+
     // If URL already contains our base URL, check if it needs conversion to download endpoint
-    if (url.startsWith(ApiConfig.baseUrl)) {
+    if (processedUrl.startsWith(ApiConfig.baseUrl)) {
       // Check if this is the old /api/files/{id} format that needs conversion
       final fileIdPattern = RegExp(r'/api/files/(\d+)$');
-      final match = fileIdPattern.firstMatch(url);
+      final match = fileIdPattern.firstMatch(processedUrl);
       if (match != null) {
         final fileId = match.group(1);
         // Convert to download endpoint format - we'll assume .mp4 for videos
@@ -94,7 +106,7 @@ class UrlUtils {
       }
 
       // Remove any existing token query parameters since we use Bearer auth
-      String normalizedUrl = _removeTokenFromUrl(url);
+      String normalizedUrl = _removeTokenFromUrl(processedUrl);
       if (kDebugMode) {
         print('URL already has base, normalized to: $normalizedUrl');
       }
@@ -102,53 +114,58 @@ class UrlUtils {
     }
 
     String baseUrl = getBaseUrl();
-    String normalizedUrl = url;
+    String normalizedUrl = processedUrl;
 
     // Handle Windows absolute file paths - convert to server URLs for mobile access
-    if (url.startsWith('C:') ||
-        url.startsWith('c:') ||
-        url.startsWith('D:') ||
-        url.startsWith('d:')) {
+    if (processedUrl.startsWith('C:') ||
+        processedUrl.startsWith('c:') ||
+        processedUrl.startsWith('D:') ||
+        processedUrl.startsWith('d:')) {
       // Extract the filename from the Windows path
-      String fileName = getFileNameFromUrl(url);
+      String fileName = getFileNameFromUrl(processedUrl);
       // Use the correct API endpoint for file downloads
       normalizedUrl = '$baseUrl/api/files/download/$fileName';
     }
     // Handle auto-generated URLs with relative paths
-    else if (url.contains('auto_generated') ||
-        url.contains('uploads/') ||
-        url.startsWith('uploads/')) {
+    else if (processedUrl.contains('auto_generated') ||
+        processedUrl.contains('uploads/') ||
+        processedUrl.startsWith('uploads/')) {
       normalizedUrl =
-          '$baseUrl/${url.startsWith('/') ? url.substring(1) : url}';
+          '$baseUrl/${processedUrl.startsWith('/') ? processedUrl.substring(1) : processedUrl}';
     }
     // Add http schema if missing but URL has a domain-like structure
-    else if (!url.startsWith('http') &&
-        !url.startsWith('file://') &&
-        url.contains('.') &&
-        !url.startsWith('/')) {
-      normalizedUrl = 'https://$url';
+    else if (!processedUrl.startsWith('http') &&
+        !processedUrl.startsWith('file://') &&
+        processedUrl.contains('.') &&
+        !processedUrl.startsWith('/')) {
+      normalizedUrl = 'https://$processedUrl';
     }
     // Add base URL for server-relative paths
-    else if (url.startsWith('/') ||
-        (!url.startsWith('http') && !url.contains(':') && url.contains('/') ||
-            url.contains('uploads') ||
-            url.contains('assets') ||
-            url.contains('images'))) {
+    else if (processedUrl.startsWith('/') ||
+        (!processedUrl.startsWith('http') &&
+                !processedUrl.contains(':') &&
+                processedUrl.contains('/') ||
+            processedUrl.contains('uploads') ||
+            processedUrl.contains('assets') ||
+            processedUrl.contains('images'))) {
       // Remove leading slash if present for consistency
-      final path = url.startsWith('/') ? url.substring(1) : url;
+      final path =
+          processedUrl.startsWith('/')
+              ? processedUrl.substring(1)
+              : processedUrl;
       normalizedUrl = '$baseUrl/$path';
     }
     // Handle Windows backslashes for file paths without drive letters
-    else if (url.contains('\\')) {
+    else if (processedUrl.contains('\\')) {
       // Extract filename and use correct API endpoint
-      String fileName = getFileNameFromUrl(url.replaceAll('\\', '/'));
+      String fileName = getFileNameFromUrl(processedUrl.replaceAll('\\', '/'));
       normalizedUrl = '$baseUrl/api/files/download/$fileName';
     }
     // Handle /api/files/{id} pattern without base URL
-    else if (url.startsWith('/api/files/') &&
-        RegExp(r'/api/files/(\d+)$').hasMatch(url)) {
+    else if (processedUrl.startsWith('/api/files/') &&
+        RegExp(r'/api/files/(\d+)$').hasMatch(processedUrl)) {
       final fileIdPattern = RegExp(r'/api/files/(\d+)$');
-      final match = fileIdPattern.firstMatch(url);
+      final match = fileIdPattern.firstMatch(processedUrl);
       if (match != null) {
         final fileId = match.group(1);
         // Convert to download endpoint format
@@ -156,11 +173,11 @@ class UrlUtils {
       }
     }
     // Handle bare filenames (likely from server responses)
-    else if (!url.contains('/') &&
-        !url.contains('\\') &&
-        !url.startsWith('http')) {
+    else if (!processedUrl.contains('/') &&
+        !processedUrl.contains('\\') &&
+        !processedUrl.startsWith('http')) {
       // This is likely a filename from the server, use the download endpoint
-      normalizedUrl = '$baseUrl/api/files/download/$url';
+      normalizedUrl = '$baseUrl/api/files/download/$processedUrl';
     }
 
     // Note: Authentication is now handled via Bearer token in Authorization header

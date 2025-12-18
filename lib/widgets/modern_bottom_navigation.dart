@@ -1,6 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../design_system/tokens/app_spacing.dart';
 
+/// Modern bottom navigation bar with responsive spacing.
+///
+/// Adapts item spacing based on screen width while maintaining
+/// minimum 44px touch targets for accessibility.
+///
+/// Requirements: 8.5
 class ModernBottomNavigation extends StatefulWidget {
   final int currentIndex;
   final Function(int) onTap;
@@ -79,6 +86,30 @@ class _ModernBottomNavigationState extends State<ModernBottomNavigation>
         bottomNavTheme.unselectedItemColor ??
         theme.colorScheme.onSurface.withValues(alpha: 0.6);
 
+    // Responsive horizontal padding - increases on larger screens
+    final horizontalPadding = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 12.0,
+      tablet: 20.0,
+      desktop: 32.0,
+    );
+
+    // Responsive max width constraint
+    final maxWidth = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: double.infinity,
+      tablet: 500.0,
+      desktop: 600.0,
+    );
+
+    // Responsive item spacing (gap between items)
+    final itemSpacing = ResponsiveLayout.value<double>(
+      context: context,
+      mobile: 4.0,
+      tablet: 8.0,
+      desktop: 12.0,
+    );
+
     return Material(
       elevation: widget.elevation ?? 12,
       color: Colors.transparent,
@@ -97,29 +128,47 @@ class _ModernBottomNavigationState extends State<ModernBottomNavigation>
           ),
         ),
         child: SafeArea(
-          child: Container(
-            height: 65,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children:
-                  widget.items.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final item = entry.value;
-                    final isSelected = index == widget.currentIndex;
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Container(
+                    height: 65,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children:
+                          widget.items.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final item = entry.value;
+                            final isSelected = index == widget.currentIndex;
 
-                    return Expanded(
-                      child: _ModernBottomNavItem(
-                        item: item,
-                        isSelected: isSelected,
-                        selectedColor: selectedColor,
-                        unselectedColor: unselectedColor,
-                        animation: _animation,
-                        onTap: () => widget.onTap(index),
-                      ),
-                    );
-                  }).toList(),
-            ),
+                            return Expanded(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: itemSpacing / 2,
+                                ),
+                                child: _ModernBottomNavItem(
+                                  item: item,
+                                  isSelected: isSelected,
+                                  selectedColor: selectedColor,
+                                  unselectedColor: unselectedColor,
+                                  animation: _animation,
+                                  onTap: () => widget.onTap(index),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -146,78 +195,93 @@ class _ModernBottomNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        splashColor: selectedColor.withValues(alpha: 0.1),
-        highlightColor: selectedColor.withValues(alpha: 0.05),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeInOut,
-          padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Icon with indicator
-              Stack(
-                alignment: Alignment.center,
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: '${item.label} tab${isSelected ? ', selected' : ''}',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          splashColor: selectedColor.withValues(alpha: 0.1),
+          highlightColor: selectedColor.withValues(alpha: 0.05),
+          child: ConstrainedBox(
+            // Ensure minimum touch target of 44px for accessibility
+            constraints: const BoxConstraints(
+              minWidth: AppSpacing.minTouchTarget,
+              minHeight: AppSpacing.minTouchTarget,
+            ),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Background indicator for selected item
-                  if (isSelected)
-                    AnimatedBuilder(
-                      animation: animation,
-                      builder: (context, child) {
-                        return Transform.scale(
-                          scale: animation.value,
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: selectedColor.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(18),
-                            ),
+                  // Icon with indicator
+                  Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // Background indicator for selected item
+                      if (isSelected)
+                        AnimatedBuilder(
+                          animation: animation,
+                          builder: (context, child) {
+                            return Transform.scale(
+                              scale: animation.value,
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: selectedColor.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(18),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      // Icon
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.all(6),
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: Icon(
+                            isSelected
+                                ? item.activeIcon ?? item.icon
+                                : item.icon,
+                            key: ValueKey(isSelected),
+                            color: isSelected ? selectedColor : unselectedColor,
+                            size: isSelected ? 24 : 22,
                           ),
-                        );
-                      },
-                    ),
-                  // Icon
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.all(6),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 200),
-                      child: Icon(
-                        isSelected ? item.activeIcon ?? item.icon : item.icon,
-                        key: ValueKey(isSelected),
-                        color: isSelected ? selectedColor : unselectedColor,
-                        size: isSelected ? 24 : 22,
+                        ),
                       ),
+                      // Badge if present
+                      if (item.badge != null)
+                        Positioned(right: 2, top: 2, child: item.badge!),
+                    ],
+                  ),
+                  const SizedBox(height: 1),
+                  // Label
+                  AnimatedDefaultTextStyle(
+                    duration: const Duration(milliseconds: 200),
+                    style: GoogleFonts.poppins(
+                      fontSize: isSelected ? 11 : 10,
+                      fontWeight:
+                          isSelected ? FontWeight.w600 : FontWeight.w500,
+                      color: isSelected ? selectedColor : unselectedColor,
+                    ),
+                    child: Text(
+                      item.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  // Badge if present
-                  if (item.badge != null)
-                    Positioned(right: 2, top: 2, child: item.badge!),
                 ],
               ),
-              const SizedBox(height: 1),
-              // Label
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: GoogleFonts.poppins(
-                  fontSize: isSelected ? 11 : 10,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
-                  color: isSelected ? selectedColor : unselectedColor,
-                ),
-                child: Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

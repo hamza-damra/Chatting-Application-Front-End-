@@ -24,7 +24,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
+class _ChatScreenState extends State<ChatScreen>
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   late final ChatProvider _chatProvider;
   late final ImprovedFileUploadService _uploadService;
   late final ws.WebSocketService _webSocketService;
@@ -34,6 +35,10 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   bool _hasError = false;
   String _errorMessage = '';
   final ScrollController _scrollController = ScrollController();
+
+  // State preservation for orientation changes
+  @override
+  bool get wantKeepAlive => true;
 
   String get _roomIdString => widget.chatRoom.id.toString();
   int get _roomId => widget.chatRoom.id;
@@ -458,6 +463,9 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // Required for AutomaticKeepAliveClientMixin to preserve state
+    super.build(context);
+    
     // Check if this is a group chat (has multiple participants)
     final isGroupChat = widget.chatRoom.participantIds.length > 2;
 
